@@ -1,24 +1,29 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { Type } from 'class-transformer';
 import { UserRole } from '@modules/auth/enum/usertype';
-import {
-  IsEmail,
-  IsEnum,
-  IsNotEmpty,
-  IsString,
-  MinLength,
-  ValidateIf,
-  IsStrongPassword,
-  IsBoolean,
-  ValidateNested,
-  ValidationArguments,
-} from 'class-validator';
+import { IsEmail, IsEnum, IsNotEmpty, IsString, MinLength, IsStrongPassword } from 'class-validator';
+import { registerDecorator, ValidationArguments, ValidationOptions } from 'class-validator';
 
-export class AdminDetails {
-  @ApiProperty({ description: 'The can_approve_requests of the admin' })
-  @IsNotEmpty()
-  @IsBoolean()
-  can_approve_requests: boolean;
+export function Match(property: string, validationOptions?: ValidationOptions) {
+  return (object: any, propertyName: string) => {
+    registerDecorator({
+      name: 'Match',
+      target: object.constructor,
+      propertyName,
+      constraints: [property],
+      options: validationOptions,
+      validator: {
+        validate(value: any, args: ValidationArguments) {
+          const [relatedPropertyName] = args.constraints;
+          const relatedValue = (args.object as any)[relatedPropertyName];
+          return value === relatedValue;
+        },
+        defaultMessage(args: ValidationArguments) {
+          const [relatedPropertyName] = args.constraints;
+          return `${propertyName} must match ${relatedPropertyName}`;
+        },
+      },
+    });
+  };
 }
 
 export class CreateAuthDto {
@@ -56,6 +61,15 @@ export class CreateAuthDto {
   password: string;
 
   @ApiProperty({
+    description: 'Confirm the password for the user account. Must match the password field.',
+    example: 'P@ssw0rd!',
+  })
+  @IsNotEmpty()
+  @IsString()
+  @Match('password', { message: 'Password and confirm password must match' })
+  confirm_password: string;
+
+  @ApiProperty({
     description: 'The type of the user',
     example: 'borrower',
   })
@@ -69,35 +83,6 @@ export class CreateAuthDto {
     message: 'Invalid user type. Valid values are: admin, hr',
   })
   role: UserRole;
-
-  @ApiProperty({
-    description: 'Role-specific details (varies by role)',
-    oneOf: [{ $ref: '#/components/schemas/AdminDetails' }],
-    required: false,
-  })
-  @ValidateNested()
-  @Type((options) => {
-    switch (options?.object.role) {
-      case UserRole.ADMIN:
-        return AdminDetails;
-      default:
-        return Object;
-    }
-  })
-  @ValidateIf((o) => o.role !== UserRole.USER) // Only validate if role is not USER
-  @IsNotEmpty({
-    message: (validationArguments: ValidationArguments) => {
-      const role = (validationArguments.object as any).role;
-      switch (role) {
-        case UserRole.ADMIN:
-          return 'Admin details are required. Please provide admin-specific information.';
-        default:
-          return 'Details are required for this role';
-      }
-    },
-    groups: [UserRole.ADMIN],
-  })
-  details?: AdminDetails;
 }
 
 export class AuthResponseDto {
@@ -149,21 +134,15 @@ export class UpdatePasswordDto {
         'Password must contain at least one uppercase letter, one lowercase letter, one number, and one special character.',
     },
   )
-  newPassword: string;
+  new_password: string;
 
   @ApiProperty({
     description: 'Confirm the password of the user',
   })
   @MinLength(8)
   @IsNotEmpty()
-  @IsStrongPassword(
-    {},
-    {
-      message:
-        'Password must contain at least one uppercase letter, one lowercase letter, one number, and one special character.',
-    },
-  )
-  confirmPassword?: string;
+  @Match('password', { message: 'Password and confirm password must match' })
+  confirm_password?: string;
 }
 
 export class UserDto {

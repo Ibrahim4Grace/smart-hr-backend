@@ -152,13 +152,13 @@ export class AuthService {
       throw new CustomHttpException(SYS_MSG.OTP_VERIFIED, HttpStatus.UNAUTHORIZED);
     }
 
-    const { newPassword } = updatePasswordDto;
-    const isSamePassword = await this.passwordService.comparePassword(newPassword, user.password);
+    const { new_password } = updatePasswordDto;
+    const isSamePassword = await this.passwordService.comparePassword(new_password, user.password);
     if (isSamePassword) throw new CustomHttpException(SYS_MSG.DUPLICATE_PASSWORD, HttpStatus.BAD_REQUEST);
 
     await this.userService.updateUserRecord({
       updatePayload: {
-        password: await this.passwordService.hashPassword(newPassword),
+        password: await this.passwordService.hashPassword(new_password),
       },
       identifierOptions: {
         identifierType: 'id',

@@ -9,9 +9,6 @@ export class User extends AbstractBaseEntity {
   @Column({ nullable: false })
   name: string;
 
-  @Column({ nullable: false })
-  username: string;
-
   @Column({ nullable: false, unique: true })
   email: string;
 

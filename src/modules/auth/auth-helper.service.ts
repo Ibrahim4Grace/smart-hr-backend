@@ -3,10 +3,6 @@ import { TokenService } from '../token/token.service';
 import { UserService } from '@modules/user/user.service';
 import { CustomHttpException } from '@shared/helpers/custom-http-filter';
 import * as SYS_MSG from '@shared/constants/SystemMessages';
-import { User } from '@modules/user/entities/user.entity';
-import { AdminDetails, CreateAuthDto } from './dto/create-auth.dto';
-import { EntityManager } from 'typeorm';
-import { UserRole } from './enum/usertype';
 
 @Injectable()
 export class AuthHelperService {
@@ -27,9 +23,7 @@ export class AuthHelperService {
     }
 
     const token = authorizationHeader.split(' ')[1];
-    if (!token) {
-      throw new CustomHttpException(SYS_MSG.TOKEN_NOT_PROVIDED, HttpStatus.UNAUTHORIZED);
-    }
+    if (!token) throw new CustomHttpException(SYS_MSG.TOKEN_NOT_PROVIDED, HttpStatus.UNAUTHORIZED);
 
     const decodedToken = await this.tokenService.verifyEmailToken(token);
     const user = await this.userService.getUserRecord({
@@ -37,9 +31,7 @@ export class AuthHelperService {
       identifierType: 'id',
     });
 
-    if (!user) {
-      throw new CustomHttpException(SYS_MSG.USER_NOT_FOUND, HttpStatus.NOT_FOUND);
-    }
+    if (!user) throw new CustomHttpException(SYS_MSG.USER_NOT_FOUND, HttpStatus.NOT_FOUND);
 
     return user;
   }
