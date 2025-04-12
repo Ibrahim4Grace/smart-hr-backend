@@ -1,8 +1,9 @@
 import { UpdateRecordGeneric } from '@shared/helpers/UpdateRecordGeneric';
-import { UserRole } from '../../auth/enum/usertype';
+import { UserRole } from '../enum/user.role';
 
 export interface UserPayload {
   userId: string;
+  name: string;
   email: string;
   role: string;
   iat: number;
@@ -21,6 +22,8 @@ export interface UserInterface {
   password: string;
 
   is_active: boolean;
+
+  status: boolean;
 
   role: UserRole;
 

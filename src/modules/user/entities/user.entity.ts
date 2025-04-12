@@ -2,7 +2,8 @@ import { Column, Entity, OneToMany, OneToOne, JoinColumn } from 'typeorm';
 import { AbstractBaseEntity } from '../../../entities/base.entity';
 import { Subscription } from '../../subscription/entities/subscription.entity';
 import { Employee } from '../../employee/entities/employee.entity';
-import { UserRole } from '../../auth/enum/usertype';
+import { UserRole } from '../enum/user.role';
+import { Profile } from '../../profile/entities/profile.entity';
 
 @Entity({ name: 'users' })
 export class User extends AbstractBaseEntity {
@@ -21,21 +22,49 @@ export class User extends AbstractBaseEntity {
   @Column({ nullable: true })
   address: string;
 
-  @Column({ type: 'enum', enum: UserRole, default: UserRole.USER })
-  role: UserRole;
+  @Column({ nullable: true })
+  deactivation_reason: string;
 
   @Column({ nullable: true })
-  profilePicture: string;
+  deactivated_by: string;
+
+  @Column({ type: 'timestamp', nullable: true })
+  deactivated_at: Date;
+
+  @Column({ nullable: true })
+  reactivation_reason: string;
+
+  @Column({ nullable: true })
+  reactivated_by: string;
+
+  @Column({ type: 'timestamp', nullable: true })
+  reactivated_at: Date;
+
+  @Column({ type: 'enum', enum: UserRole, default: UserRole.USER })
+  role: UserRole;
 
   @Column({ default: false })
   emailVerified: boolean;
 
+  @Column({ default: true })
+  status: boolean;
+
   @Column({ default: false })
   is_active: boolean;
 
-  @OneToMany(() => Subscription, (subscription) => subscription.user)
+  @OneToOne(() => Profile, (profile) => profile.user, {
+    cascade: true, // Auto save/update/delete profile
+    onDelete: 'CASCADE', // DB-level cascade
+  })
+  profile: Profile;
+
+  @OneToMany(() => Subscription, (subscription) => subscription.user, {
+    cascade: true,
+  })
   subscriptions: Subscription[];
 
-  @OneToMany(() => Employee, (employee) => employee.user) // If employees are linked to users
+  @OneToMany(() => Employee, (employee) => employee.user, {
+    cascade: true,
+  })
   employees: Employee[]; // Only if users can have multiple employee profiles or if this is a 1:1 relationship
 }

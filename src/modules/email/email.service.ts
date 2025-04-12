@@ -10,9 +10,11 @@ import { MailInterface } from './interface/mail.interface';
 import { CustomHttpException } from '@shared/helpers/custom-http-filter';
 import * as SYS_MSG from '@shared/constants/SystemMessages';
 import { getFile, createFile, deleteFile } from '@shared/helpers/fileHelpers';
+import { Logger } from '@nestjs/common';
 
 @Injectable()
 export class EmailService {
+  private readonly logger = new Logger(EmailService.name);
   constructor(private readonly mailerService: QueueService) {}
 
   async sendUserEmailConfirmationOtp(email: string, name: string, otp: string) {
@@ -64,6 +66,53 @@ export class EmailService {
     };
 
     await this.mailerService.sendMail({ variant: 'reset-successful', mail: mailPayload });
+  }
+
+  async sendDeactivationNotification(
+    email: string,
+    name: string,
+    timestamp: string,
+    context: { reason: string; admin: string },
+  ) {
+    this.logger.log(
+      `Preparing deactivation email for ${email} with context: ${JSON.stringify({ name, ...context, timestamp })}`,
+    );
+    const mailPayload: MailInterface = {
+      to: email,
+      context: {
+        name,
+        reason: context.reason,
+        admin: context.admin,
+        timestamp,
+      },
+    };
+    this.logger.log(`Sending mail payload to queue: ${JSON.stringify(mailPayload)}`);
+    await this.mailerService.sendMail({
+      variant: 'deactivate-notification',
+      mail: mailPayload,
+    });
+  }
+
+  async sendReactivationNotification(
+    email: string,
+    name: string,
+    timestamp: string,
+    context: { reason?: string; admin: string },
+  ) {
+    const mailPayload: MailInterface = {
+      to: email,
+      context: {
+        name,
+        reason: context.reason || 'Account reviewed',
+        admin: context.admin,
+        timestamp,
+      },
+    };
+
+    await this.mailerService.sendMail({
+      variant: 'reactivate-notification',
+      mail: mailPayload,
+    });
   }
 
   async createTemplate(templateInfo: createTemplateDto) {

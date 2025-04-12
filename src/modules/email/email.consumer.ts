@@ -81,4 +81,46 @@ export default class EmailQueueConsumer {
       this.logger.error(`EmailQueueConsumer ~ sendPasswordChangedEmailJobError:   ${sendPasswordChangedEmailJobError}`);
     }
   }
+
+  @Process('deactivate-notification')
+  async sendDeactivationEmail(job: Job<MailInterface>) {
+    try {
+      const { mail } = job.data;
+      this.logger.log(`Processing deactivation email job for ${mail.to} with full context: ${JSON.stringify(mail)}`);
+
+      await this.mailerService.sendMail({
+        ...mail,
+        subject: 'Your Account Has Been Deactivated',
+        template: 'deactivate-notification',
+        // context: mail.context,
+      });
+      this.logger.log(`Deactivation notice sent successfully to ${mail.to}`);
+    } catch (error) {
+      // this.logger.error(`Deactivation email failed for ${job.data.mail.to}`, error.stack);
+      this.logger.error(`Deactivation email failed for ${job.data.mail.to}`, {
+        error: error.message,
+        stack: error.stack,
+        jobData: JSON.stringify(job.data),
+      });
+      throw error;
+    }
+  }
+
+  @Process('reactivate-notification')
+  async sendReactivationEmail(job: Job<MailInterface>) {
+    try {
+      const { mail } = job.data;
+      this.logger.log(`Sending reactivation notice to ${mail.to}`);
+
+      await this.mailerService.sendMail({
+        ...mail,
+        subject: 'Your Account Has Been Reactivated',
+        template: 'reactivate-notification',
+      });
+
+      this.logger.log(`Reactivation notice sent to ${mail.to}`);
+    } catch (error) {
+      this.logger.error(`Reactivation email failed for ${job.data.mail.to}`, error.stack);
+    }
+  }
 }

@@ -5,6 +5,7 @@ export const USER_CREATED = 'User Created Successfully';
 export const FAILED_TO_CREATE_USER = 'Error Occured while creating user, kindly try again';
 export const ERROR_OCCURED = 'Error Occured Performing this request';
 export const USER_ACCOUNT_EXIST = 'Account with the specified email exists';
+export const USER_DEACTIVATED = 'User has already been deactivated';
 export const USER_ACCOUNT_DOES_NOT_EXIST = "Account with the specified email doesn't exist";
 export const UNAUTHENTICATED_MESSAGE = 'User is currently unauthorized, kindly authenticate to continue';
 export const EMAIL_VERIFIED_SUCCESSFULLY = 'Email verified successfully';
@@ -12,7 +13,8 @@ export const OTP_VERIFIED_SUCCESSFULLY = 'Otp verified successfully';
 export const OTP_VERIFIED = 'OTP not verified for this operation';
 export const INVALID_HEADER = 'Invalid or missing Authorization header';
 export const TOKEN_NOT_PROVIDED = 'Token not provided in Authorization header';
-
+export const ACCOUNT_INACTIVE = 'Account is inactive, please contact support';
+export const USER_ACTIVATEED = 'User already active';
 // export const TWO_FACTOR_VERIFIED_SUCCESSFULLY = '2FA verified and enabled';
 // export const ANALYTICS_FETCHED_SUCCESSFULLY = 'Admin Analytics fetched successfully';
 // export const DASHBOARD_FETCHED_SUCCESSFULLY = 'Admin Dashboard retrieved successfully';
