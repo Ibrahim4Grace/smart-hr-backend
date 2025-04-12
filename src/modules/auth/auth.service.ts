@@ -8,12 +8,11 @@ import { CreateUserResponse } from './interfaces/auth.interface';
 import { DataSource, EntityManager } from 'typeorm';
 import { TokenService } from '../token/token.service';
 import { PasswordService } from './password.service';
+import { timestamp } from '@utils/time';
 import * as bcrypt from 'bcryptjs';
 import { Logger } from '@nestjs/common';
 import { AuthHelperService } from './auth-helper.service';
 import { CreateAuthDto, ForgotPasswordDto, UpdatePasswordDto, LoginResponseDto, LoginDto } from './dto/create-auth.dto';
-
-const timestamp = new Date().toLocaleString('en-US', { dateStyle: 'long', timeStyle: 'short' });
 
 @Injectable()
 export class AuthService {
@@ -188,15 +187,17 @@ export class AuthService {
     const isMatch = await bcrypt.compare(password, user.password);
     if (!isMatch) throw new CustomHttpException(SYS_MSG.INVALID_CREDENTIALS, HttpStatus.UNAUTHORIZED);
 
-    const access_token = this.tokenService.createAuthToken({
-      userId: user.id,
-      role: user.role,
-    });
+    if (!user.status || !user.is_active) {
+      throw new CustomHttpException(SYS_MSG.ACCOUNT_INACTIVE, HttpStatus.FORBIDDEN);
+    }
 
-    const refresh_token = this.tokenService.createRefreshToken({
+    const tokenPayload = {
       userId: user.id,
       role: user.role,
-    });
+    };
+
+    const access_token = this.tokenService.createAuthToken(tokenPayload);
+    const refresh_token = this.tokenService.createRefreshToken(tokenPayload);
 
     const responsePayload = {
       access_token,

@@ -1,4 +1,4 @@
-import { UserRole } from '@modules/auth/enum/usertype';
+import { UserRole } from '../../user/enum/user.role';
 
 export interface CreateUserResponse {
   message: string;

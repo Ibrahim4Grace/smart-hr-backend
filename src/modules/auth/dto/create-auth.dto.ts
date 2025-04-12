@@ -1,5 +1,5 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { UserRole } from '@modules/auth/enum/usertype';
+import { UserRole } from '../../user/enum/user.role';
 import { IsEmail, IsEnum, IsNotEmpty, IsString, MinLength, IsStrongPassword } from 'class-validator';
 import { registerDecorator, ValidationArguments, ValidationOptions } from 'class-validator';
 
