@@ -1,4 +1,6 @@
-import { HttpStatus, Injectable } from '@nestjs/common';
+import { Inject, Injectable ,HttpStatus} from '@nestjs/common';
+import { JwtService } from '@nestjs/jwt';
+import { ConfigService } from '@nestjs/config';
 import * as SYS_MSG from '@shared/constants/SystemMessages';
 import { UserService } from '@modules/user/user.service';
 import { OtpService } from '@modules/otp/otp.service';
@@ -25,7 +27,11 @@ export class AuthService {
     private readonly tokenService: TokenService,
     private passwordService: PasswordService,
     private readonly authHelperService: AuthHelperService,
+    @Inject('JWT_REFRESH_SERVICE') 
+    private readonly jwtRefreshService: JwtService, 
+    private readonly configService: ConfigService
   ) {}
+
 
   async create(createUserDto: CreateAuthDto): Promise<CreateUserResponse> {
     const result = await this.dataSource.transaction(async (manager: EntityManager) => {
@@ -102,9 +108,7 @@ export class AuthService {
 
   async forgotPassword(dto: ForgotPasswordDto): Promise<{ message: string; token: string }> {
     const user = await this.userService.getUserRecord({ identifier: dto.email, identifierType: 'email' });
-    if (!user) {
-      throw new CustomHttpException(SYS_MSG.USER_ACCOUNT_DOES_NOT_EXIST, HttpStatus.BAD_REQUEST);
-    }
+    if (!user) throw new CustomHttpException(SYS_MSG.USER_ACCOUNT_DOES_NOT_EXIST, HttpStatus.BAD_REQUEST);
 
     await this.otpService.remove(user.id);
 
@@ -147,10 +151,8 @@ export class AuthService {
     const user = await this.authHelperService.validateBearerToken(authorization);
 
     const otpVerified = await this.otpService.isOtpVerified(user.id);
-    if (!otpVerified) {
-      throw new CustomHttpException(SYS_MSG.OTP_VERIFIED, HttpStatus.UNAUTHORIZED);
-    }
-
+    if (!otpVerified) throw new CustomHttpException(SYS_MSG.OTP_VERIFIED, HttpStatus.UNAUTHORIZED);
+    
     const { new_password } = updatePasswordDto;
     const isSamePassword = await this.passwordService.comparePassword(new_password, user.password);
     if (isSamePassword) throw new CustomHttpException(SYS_MSG.DUPLICATE_PASSWORD, HttpStatus.BAD_REQUEST);
@@ -187,9 +189,8 @@ export class AuthService {
     const isMatch = await bcrypt.compare(password, user.password);
     if (!isMatch) throw new CustomHttpException(SYS_MSG.INVALID_CREDENTIALS, HttpStatus.UNAUTHORIZED);
 
-    if (!user.status || !user.is_active) {
-      throw new CustomHttpException(SYS_MSG.ACCOUNT_INACTIVE, HttpStatus.FORBIDDEN);
-    }
+    if (!user.status || !user.is_active) throw new CustomHttpException(SYS_MSG.ACCOUNT_INACTIVE, HttpStatus.FORBIDDEN);
+    
 
     const tokenPayload = {
       userId: user.id,
@@ -218,6 +219,13 @@ export class AuthService {
   async refreshToken(refresh_token: string): Promise<{ access_token: string }> {
     try {
       const payload = await this.tokenService.verifyRefreshToken(refresh_token);
+       
+      const user = await this.userService.getUserRecord({
+        identifier: payload.userId,
+        identifierType: 'id'
+      });
+      if (!user) throw new CustomHttpException(SYS_MSG.INVALID_REFRESH_TOKEN, HttpStatus.UNAUTHORIZED);
+      
       const access_token = this.tokenService.createAuthToken({
         userId: payload.userId,
         role: payload.role,

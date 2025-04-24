@@ -7,6 +7,7 @@ import { ClientModule } from '@modules/client/client.module';
 import { TodoModule } from '@modules/todo/todo.module';
 import { TicketModule } from '@modules/ticket/ticket.module';
 import { ProjectModule } from '@modules/project/project.module';
+import corsConfig from '@config/cors.config';
 import { SalesModule } from '@modules/sales/sales.module';
 import { GatewayModule } from '@modules/gateway/gateway.module';
 import { AuthModule } from '@modules/auth/auth.module';
@@ -49,7 +50,7 @@ import { parse } from 'url';
   imports: [
     ConfigModule.forRoot({
       envFilePath: ['.env', `.env.${process.env.PROFILE}`],
-      load: [serverConfig, authConfig],
+      load: [serverConfig, authConfig, corsConfig],
       isGlobal: true,
     }),
     LoggerModule.forRootAsync({
@@ -88,9 +89,12 @@ import { parse } from 'url';
       imports: [ConfigModule],
       useFactory: async (configService: ConfigService) => ({
         secret: configService.get<string>('JWT_AUTH_SECRET'),
-        signOptions: { expiresIn: '1d' },
+        signOptions: { 
+          expiresIn: configService.get<string>('JWT_AUTH_EXPIRES_IN') 
+        },
       }),
       inject: [ConfigService],
+      global: true,
     }),
 
     MailerModule.forRootAsync({

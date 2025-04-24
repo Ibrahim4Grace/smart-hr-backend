@@ -3,16 +3,32 @@ import 'reflect-metadata';
 import { Request, Response } from 'express';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import { Logger } from 'nestjs-pino';
+import * as compression from 'compression';
+import helmet from 'helmet';
+import rateLimit from 'express-rate-limit';
 import { NestFactory, Reflector } from '@nestjs/core';
 import { DataSource } from 'typeorm';
 import { initializeDataSource } from './database/data-source';
 import { ConfigService } from '@nestjs/config';
 import { AppModule } from './app.module';
-import { ResponseInterceptor } from '@shared/inteceptors/response-interceptor';
+import { ResponseInterceptor } from '@shared/inteceptors/response.interceptor';
 import { HttpExceptionFilter } from '@shared/helpers/http-exception-filter';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
+
+  app.use(helmet());
+  app.use(compression());
+  app.use(
+    rateLimit({
+      windowMs: 60 * 1000,
+      max: 100,
+      message: 'Too many requests from this IP, please try again later.',
+    }),
+  );
+
+  const configService = app.get(ConfigService);
+  app.enableCors(configService.get('cors'));
 
   app.getHttpAdapter().getInstance().disable('x-powered-by');
 
@@ -28,7 +44,6 @@ async function bootstrap() {
     process.exit(1);
   }
 
-  app.enableCors();
   app.useLogger(logger);
   app.setGlobalPrefix('api/v1', {
     exclude: ['/', 'health', 'api', 'api/v1', 'api/docs', 'probe'],

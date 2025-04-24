@@ -16,6 +16,9 @@ import { EmailModule } from '@modules/email/email.module';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { PasswordService } from '../auth/password.service';
 import { AuthHelperService } from './auth-helper.service';
+import { JwtService } from '@nestjs/jwt';
+
+import { APP_INTERCEPTOR } from '@nestjs/core';
 
 @Module({
   controllers: [AuthController],
@@ -28,20 +31,17 @@ import { AuthHelperService } from './auth-helper.service';
     EmailService,
     PasswordService,
     AuthHelperService,
+    {
+      provide: 'JWT_REFRESH_SERVICE',
+      useExisting: JwtService, // Use the global JwtService
+    },
   ],
   imports: [
     TypeOrmModule.forFeature([User, Otp, Role]),
     OtpModule,
     EmailModule,
     ConfigModule,
-    JwtModule.registerAsync({
-      imports: [ConfigModule],
-      useFactory: async (configService: ConfigService) => ({
-        secret: configService.get<string>('JWT_AUTH_SECRET'),
-        signOptions: { expiresIn: '1d' },
-      }),
-      inject: [ConfigService],
-    }),
   ],
+  exports: [AuthService],
 })
 export class AuthModule {}

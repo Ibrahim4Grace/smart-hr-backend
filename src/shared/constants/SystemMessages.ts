@@ -92,6 +92,20 @@ export const MAX_PROFILE_PICTURE_SIZE = 2 * 1024 * 1024;
 export const VALID_UPLOADS_MIME_TYPES = ['image/jpeg', 'image/png'];
 export const BASE_URL = 'https://';
 export const PROFILE_PHOTO_UPLOADS = path.join(__dirname, '..', 'uploads');
+export const NO_FILE_FOUND = 'No file uploaded.';
+export const PROFILE_PIC_NOT_FOUND = 'Previous profile picture pic not found';
+export const PROFILE_PIC_ERROR = 'Error deleting previous profile picture:';
+export const FILE_SAVE_ERROR = 'Error saving file to disk';
+export const PICTURE_UPDATED = 'Profile picture updated successfully';
+export const ERROR_DIRECTORY = 'Error creating uploads directory:';
+export const DIRECTORY_CREATED = 'Uploads directory created at:';
+
+export const FILE_EXCEEDS_SIZE = (resource) => {
+  return `File size exceeds ${resource} MB limit`;
+};
+export const INVALID_FILE_TYPE = (resource) => {
+  return `Invalid file type. Allowed types: ${resource}`;
+};
 
 export const ACCESS_DENIED_USER_PROFILE = 'Access denied: You can only view your own user profile';
 export const ACCESS_DENIED_USER_UPDATE = 'Access denied: You can only update your own user profile';

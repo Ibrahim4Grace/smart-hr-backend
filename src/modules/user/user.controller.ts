@@ -1,29 +1,13 @@
-import {
-  Controller,
-  Get,
-  HttpStatus,
-  Post,
-  Body,
-  Patch,
-  Param,
-  Delete,
-  Query,
-  Req,
-  Request,
-  UseGuards,
-} from '@nestjs/common';
-import { Logger } from '@nestjs/common';
+import { Controller, Get, Body, Patch, Param, Delete, Query, Request, UseGuards } from '@nestjs/common';
 import { UserPayload } from './interface/user.interface';
 import { UserService } from './user.service';
 import { ApiBearerAuth, ApiOperation, ApiResponse, ApiQuery } from '@nestjs/swagger';
 import { AdminGuard } from '@guards/admin.guard';
-import { GetUser } from '../../decorators/get-user.decorator';
+import { GetUser } from '@shared/decorators/get-user.decorator';
 import { UpdateUserDto, DeactivateAccountDto, ReactivateAccountDto } from './dto/create-user.dto';
-import { CustomHttpException } from '@shared/helpers/custom-http-filter';
 
 @Controller('users')
 export class UserController {
-  private logger = new Logger(UserController.name);
   constructor(private readonly userService: UserService) {}
 
   @UseGuards(AdminGuard)

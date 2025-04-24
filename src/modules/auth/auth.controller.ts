@@ -6,7 +6,7 @@ import { AuthService } from './auth.service';
 import { CreateAuthDto } from './dto/create-auth.dto';
 import { OtpDto } from '../otp/dto/create-otp.dto';
 import { ErrorCreateUserResponse, SuccessCreateUserResponse } from '../user/dto/create-user.dto';
-import { Body, Controller, HttpCode, Post, Patch, Headers } from '@nestjs/common';
+import { Body, Controller, HttpCode,Post, Patch, Headers } from '@nestjs/common';
 import {
   LoginDto,
   LoginResponseDto,
@@ -95,6 +95,7 @@ export class AuthController {
   @HttpCode(200)
   public async login(@Body() loginDto: LoginDto): Promise<LoginResponseDto> {
     return this.authService.login(loginDto);
+
   }
 
   @skipAuth()

@@ -1,5 +1,4 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { UserRole } from '../../user/enum/user.role';
 import { IsEmail, IsEnum, IsNotEmpty, IsString, MinLength, IsStrongPassword } from 'class-validator';
 import { registerDecorator, ValidationArguments, ValidationOptions } from 'class-validator';
 
@@ -68,21 +67,6 @@ export class CreateAuthDto {
   @IsString()
   @Match('password', { message: 'Password and confirm password must match' })
   confirm_password: string;
-
-  @ApiProperty({
-    description: 'The type of the user',
-    example: 'borrower',
-  })
-  @ApiProperty({
-    description: 'The type of the user',
-    example: 'admin, hr ',
-    enum: UserRole,
-  })
-  @IsNotEmpty()
-  @IsEnum(UserRole, {
-    message: 'Invalid user type. Valid values are: admin, hr',
-  })
-  role: UserRole;
 }
 
 export class AuthResponseDto {
@@ -141,7 +125,7 @@ export class UpdatePasswordDto {
   })
   @MinLength(8)
   @IsNotEmpty()
-  @Match('password', { message: 'Password and confirm password must match' })
+  @Match('new_password', { message: 'Password and confirm password must match' })
   confirm_password?: string;
 }
 

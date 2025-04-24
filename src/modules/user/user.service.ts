@@ -60,6 +60,34 @@ export class UserService {
     return user;
   }
 
+  async getUserDataWithoutPasswordById(id: string) {
+    const user = await this.getUserRecord({ identifier: id, identifierType: 'id' });
+    if (!user) throw new CustomHttpException(SYS_MSG.USER_NOT_FOUND, HttpStatus.NOT_FOUND);
+
+    const { password, ...userData } = user;
+
+    return {
+      status_code: 200,
+      user: userData,
+    };
+  }
+
+  async getUserDataWithoutPassword(userId: string, requestingUserId: string) {
+    const user = await this.getUserRecord({ identifier: userId, identifierType: 'id' });
+    if (!user) throw new CustomHttpException(SYS_MSG.USER_NOT_FOUND, HttpStatus.NOT_FOUND);
+
+    if (user.id !== requestingUserId) {
+      throw new CustomHttpException(SYS_MSG.ACCESS_DENIED_USER_PROFILE, HttpStatus.FORBIDDEN);
+    }
+
+    const { password, ...userData } = user;
+
+    return {
+      status_code: 200,
+      user: userData,
+    };
+  }
+
   async updateUserRecord(userUpdateOptions: UpdateUserRecordOption) {
     const { updatePayload, identifierOptions } = userUpdateOptions;
     const user = await this.getUserRecord(identifierOptions);
@@ -252,32 +280,4 @@ export class UserService {
       message: 'User reactivated successfully',
     };
   }
-
-  // async getUserDataWithoutPasswordById(id: string) {
-  //   const user = await this.getUserRecord({ identifier: id, identifierType: 'id' });
-  //   if (!user) throw new CustomHttpException(SYS_MSG.USER_NOT_FOUND, HttpStatus.NOT_FOUND);
-
-  //   const { password, ...userData } = user;
-
-  //   return {
-  //     status_code: 200,
-  //     user: userData,
-  //   };
-  // }
-
-  // async getUserDataWithoutPassword(userId: string, requestingUserId: string) {
-  //   const user = await this.getUserRecord({ identifier: userId, identifierType: 'id' });
-  //   if (!user) throw new CustomHttpException(SYS_MSG.USER_NOT_FOUND, HttpStatus.NOT_FOUND);
-
-  //   if (user.id !== requestingUserId) {
-  //     throw new CustomHttpException(SYS_MSG.ACCESS_DENIED_USER_PROFILE, HttpStatus.FORBIDDEN);
-  //   }
-
-  //   const { password, ...userData } = user;
-
-  //   return {
-  //     status_code: 200,
-  //     user: userData,
-  //   };
-  // }
 }

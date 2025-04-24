@@ -34,7 +34,7 @@ export interface UserInterface {
   phone?: string;
 }
 
-export type CreateNewUserOptions = Pick<UserInterface, 'email' | 'name' | 'password' | 'role'> & {
+export type CreateNewUserOptions = Pick<UserInterface, 'email' | 'name' | 'password'> & {
   admin_secret?: string;
 };
 
