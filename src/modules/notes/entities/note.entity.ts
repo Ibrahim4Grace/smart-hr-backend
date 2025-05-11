@@ -19,7 +19,7 @@ export class Note extends AbstractBaseEntity {
     title: string;
 
     @Column({ type: 'text' })
-    assignee: string;
+    assigned_to: string;
 
     @Column({ type: 'text' })
     content: string;
@@ -41,10 +41,6 @@ export class Note extends AbstractBaseEntity {
     @JoinColumn({ name: 'user_id' })
     user: User;
 
-    // @Index()
-    // @ManyToOne(() => User, { nullable: true })
-    // @JoinColumn({ name: 'assignee_id' })
-    // assignee: User;
 }
 
 

@@ -1,14 +1,12 @@
-import { Inject, Injectable ,HttpStatus} from '@nestjs/common';
-import { JwtService } from '@nestjs/jwt';
-import { ConfigService } from '@nestjs/config';
+import { Injectable, HttpStatus } from '@nestjs/common';
 import * as SYS_MSG from '@shared/constants/SystemMessages';
 import { UserService } from '@modules/user/user.service';
-import { OtpService } from '@modules/otp/otp.service';
-import { EmailService } from '@modules/email/email.service';
+import { OtpService } from '@shared/otp/otp.service';
+import { EmailQueueService } from '@modules/email-queue/email-queue.service';
 import { CustomHttpException } from '@shared/helpers/custom-http-filter';
 import { CreateUserResponse } from './interfaces/auth.interface';
 import { DataSource, EntityManager } from 'typeorm';
-import { TokenService } from '../token/token.service';
+import { TokenService } from '@shared/token/token.service';
 import { PasswordService } from './password.service';
 import { timestamp } from '@utils/time';
 import * as bcrypt from 'bcryptjs';
@@ -22,15 +20,12 @@ export class AuthService {
   constructor(
     private readonly userService: UserService,
     private readonly otpService: OtpService,
-    private readonly emailService: EmailService,
+    private readonly emailService: EmailQueueService,
     private readonly dataSource: DataSource,
     private readonly tokenService: TokenService,
     private passwordService: PasswordService,
     private readonly authHelperService: AuthHelperService,
-    @Inject('JWT_REFRESH_SERVICE') 
-    private readonly jwtRefreshService: JwtService, 
-    private readonly configService: ConfigService
-  ) {}
+  ) { }
 
 
   async create(createUserDto: CreateAuthDto): Promise<CreateUserResponse> {
@@ -45,7 +40,7 @@ export class AuthService {
       if (!user) throw new CustomHttpException(SYS_MSG.FAILED_TO_CREATE_USER, HttpStatus.BAD_REQUEST);
 
       const otpResult = await this.otpService.create(user.id, manager);
-      if (!otpResult) throw new CustomHttpException(SYS_MSG.FAILED, HttpStatus.INTERNAL_SERVER_ERROR);
+      if (!otpResult) throw new CustomHttpException(SYS_MSG.FAILED_OTP, HttpStatus.INTERNAL_SERVER_ERROR);
 
       const preliminaryToken = this.tokenService.createEmailVerificationToken({
         userId: user.id,
@@ -113,7 +108,7 @@ export class AuthService {
     await this.otpService.remove(user.id);
 
     const otpResult = await this.otpService.create(user.id);
-    if (!otpResult) throw new CustomHttpException('Failed to generate OTP', HttpStatus.INTERNAL_SERVER_ERROR);
+    if (!otpResult) throw new CustomHttpException(SYS_MSG.FAILED_OTP, HttpStatus.INTERNAL_SERVER_ERROR);
 
     const preliminaryToken = this.tokenService.createEmailVerificationToken({
       userId: user.id,
@@ -152,22 +147,24 @@ export class AuthService {
 
     const otpVerified = await this.otpService.isOtpVerified(user.id);
     if (!otpVerified) throw new CustomHttpException(SYS_MSG.OTP_VERIFIED, HttpStatus.UNAUTHORIZED);
-    
+
     const { new_password } = updatePasswordDto;
     const isSamePassword = await this.passwordService.comparePassword(new_password, user.password);
     if (isSamePassword) throw new CustomHttpException(SYS_MSG.DUPLICATE_PASSWORD, HttpStatus.BAD_REQUEST);
 
-    await this.userService.updateUserRecord({
-      updatePayload: {
-        password: await this.passwordService.hashPassword(new_password),
-      },
-      identifierOptions: {
-        identifierType: 'id',
-        identifier: user.id,
-      },
-    });
+    const hashedPassword = await this.passwordService.hashPassword(new_password);
 
-    await this.otpService.remove(user.id);
+    // Password update and OTP removal done in parallel
+    const [updateResult] = await Promise.all([
+      this.userService.updateUserRecord({
+        updatePayload: { password: hashedPassword },
+        identifierOptions: {
+          identifierType: 'id',
+          identifier: user.id,
+        },
+      }),
+      this.otpService.remove(user.id)
+    ]);
 
     await this.emailService.sendPasswordChangedMail(user.email, user.name, timestamp);
     this.logger.log(`Successfully sent password changed confirmation to ${user.email}`);
@@ -190,7 +187,7 @@ export class AuthService {
     if (!isMatch) throw new CustomHttpException(SYS_MSG.INVALID_CREDENTIALS, HttpStatus.UNAUTHORIZED);
 
     if (!user.status || !user.is_active) throw new CustomHttpException(SYS_MSG.ACCOUNT_INACTIVE, HttpStatus.FORBIDDEN);
-    
+
 
     const tokenPayload = {
       userId: user.id,
@@ -219,13 +216,13 @@ export class AuthService {
   async refreshToken(refresh_token: string): Promise<{ access_token: string }> {
     try {
       const payload = await this.tokenService.verifyRefreshToken(refresh_token);
-       
+
       const user = await this.userService.getUserRecord({
         identifier: payload.userId,
         identifierType: 'id'
       });
       if (!user) throw new CustomHttpException(SYS_MSG.INVALID_REFRESH_TOKEN, HttpStatus.UNAUTHORIZED);
-      
+
       const access_token = this.tokenService.createAuthToken({
         userId: payload.userId,
         role: payload.role,

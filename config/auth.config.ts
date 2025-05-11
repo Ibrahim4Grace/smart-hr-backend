@@ -15,4 +15,5 @@ export default registerAs('auth', () => ({
     password: process.env.REDIS_PASSWORD,
     username: process.env.REDIS_USERNAME,
   },
+  frontendUrl: process.env.FRONTEND_URL,
 }));

@@ -1,260 +1,308 @@
-import { HttpStatus, Injectable } from '@nestjs/common';
-import Handlebars from 'handlebars';
-import * as htmlValidator from 'html-validator';
-import * as fs from 'fs';
-import { promisify } from 'util';
-import * as path from 'path';
-import { QueueService } from './queue.service';
-import { createTemplateDto, getTemplateDto, UpdateTemplateDto } from './dto/email.dto';
-import { MailInterface } from './interface/mail.interface';
-import { CustomHttpException } from '@shared/helpers/custom-http-filter';
-import * as SYS_MSG from '@shared/constants/SystemMessages';
-import { getFile, createFile, deleteFile } from '@shared/helpers/fileHelpers';
-import { Logger } from '@nestjs/common';
+import { Injectable, Logger, NotFoundException } from '@nestjs/common';
+import { InjectRepository } from '@nestjs/typeorm';
+import { Repository, Like } from 'typeorm';
+import { EmailAccount } from './entities/email.entity';
+import { SendEmailDto } from './dto/send-email.dto';
+import { ReplyEmailDto } from './dto/reply-email.dto';
+import { MailerService } from '@nestjs-modules/mailer';
+import { EntityPermissionsService } from '@shared/services/permissions.service';
+import { EmailAttachment } from './interface/email.interface';
+import { CloudinaryService } from '@shared/services/cloudinary.service';
+import { PaginationService } from '@shared/services/pagination.service';
+import { CacheService } from '@shared/cache/cache.service';
+import { CachePrefixesService } from '@shared/cache/cache.prefixes.service';
+import { NotificationService } from '@shared/notification/notification.service';
 
 @Injectable()
 export class EmailService {
   private readonly logger = new Logger(EmailService.name);
-  constructor(private readonly mailerService: QueueService) {}
 
-  async sendUserEmailConfirmationOtp(email: string, name: string, otp: string) {
-    const mailPayload: MailInterface = {
-      to: email,
-      context: {
-        otp,
-        name,
-      },
-    };
+  constructor(
+    @InjectRepository(EmailAccount)
+    private readonly emailRepository: Repository<EmailAccount>,
+    private readonly mailerService: MailerService,
+    private readonly permissionsService: EntityPermissionsService,
+    private readonly cloudinaryService: CloudinaryService,
+    private readonly paginationService: PaginationService,
+    private readonly cacheService: CacheService,
+    private readonly cachePrefixes: CachePrefixesService,
+    private readonly notificationService: NotificationService,
+  ) { }
 
-    // await this.mailerService.sendMail({ variant: 'register-otp', mail: mailPayload });
-    const { jobId } = await this.mailerService.sendMail({ variant: 'register-otp', mail: mailPayload });
+
+  private extractEmail(emailStr: string): string {
+    const match = emailStr.match(/<([^>]+)>/);
+    return match ? match[1] : emailStr;
   }
 
-  async sendUserConfirmationMail(email: string, name: string, timestamp: string) {
-    const mailPayload: MailInterface = {
-      to: email,
-      context: {
-        name,
-        email,
-        timestamp,
-      },
-    };
-
-    await this.mailerService.sendMail({ variant: 'welcome', mail: mailPayload });
-  }
-
-  async sendForgotPasswordMail(email: string, name: string, otp: string) {
-    const mailPayload: MailInterface = {
-      to: email,
-      context: {
-        name,
-        otp,
-      },
-    };
-
-    await this.mailerService.sendMail({ variant: 'forgot-otp', mail: mailPayload });
-  }
-
-  async sendPasswordChangedMail(email: string, name: string, timestamp: string) {
-    const mailPayload: MailInterface = {
-      to: email,
-      context: {
-        name,
-        email,
-        timestamp,
-      },
-    };
-
-    await this.mailerService.sendMail({ variant: 'reset-successful', mail: mailPayload });
-  }
-
-  async sendDeactivationNotification(
-    email: string,
-    name: string,
-    timestamp: string,
-    context: { reason: string; admin: string },
-  ) {
-    this.logger.log(
-      `Preparing deactivation email for ${email} with context: ${JSON.stringify({ name, ...context, timestamp })}`,
+  private async getUserWithCache(userId: string): Promise<any> {
+    return this.cacheService.getOrSet(
+      this.cachePrefixes.USER,
+      userId,
+      () => this.permissionsService.getUserById(userId),
+      this.cacheService.CACHE_TTL.MEDIUM
     );
-    const mailPayload: MailInterface = {
-      to: email,
-      context: {
-        name,
-        reason: context.reason,
-        admin: context.admin,
-        timestamp,
-      },
-    };
-    this.logger.log(`Sending mail payload to queue: ${JSON.stringify(mailPayload)}`);
-    await this.mailerService.sendMail({
-      variant: 'deactivate-notification',
-      mail: mailPayload,
-    });
   }
 
-  async sendReactivationNotification(
-    email: string,
-    name: string,
-    timestamp: string,
-    context: { reason?: string; admin: string },
-  ) {
-    const mailPayload: MailInterface = {
-      to: email,
-      context: {
-        name,
-        reason: context.reason || 'Account reviewed',
-        admin: context.admin,
-        timestamp,
-      },
-    };
 
-    await this.mailerService.sendMail({
-      variant: 'reactivate-notification',
-      mail: mailPayload,
-    });
-  }
-
-  async createTemplate(templateInfo: createTemplateDto) {
-    try {
-      const validationResult = await htmlValidator({ data: templateInfo.template });
-
-      const filteredMessages = validationResult.messages.filter(
-        (message) =>
-          !(
-            (message.message.includes('Trailing slash on void elements has no effect') && message.type === 'info') ||
-            (message.message.includes('Consider adding a "lang" attribute') && message.subType === 'warning')
-          ),
-      );
-
-      const response = {
-        status_code: HttpStatus.CREATED,
-        message: 'Template created successfully',
-        validation_errors: [] as string[],
-      };
-
-      if (filteredMessages.length > 0) {
-        response.status_code = HttpStatus.BAD_REQUEST;
-        response.message = 'Invalid HTML format';
-        response.validation_errors = filteredMessages.map((msg) => msg.message);
-      }
-
-      if (response.status_code === HttpStatus.CREATED) {
-        await createFile('./src/modules/email/templates', `${templateInfo.templateName}.hbs`, templateInfo.template);
-      }
-
-      return response;
-    } catch (error) {
-      return {
-        status_code: HttpStatus.INTERNAL_SERVER_ERROR,
-        message: 'Something went wrong, please try again',
-      };
-    }
-  }
-
-  async updateTemplate(templateName: string, templateInfo: UpdateTemplateDto) {
-    const html = Handlebars.compile(templateInfo.template)({});
-
-    const validationResult = await htmlValidator({ data: html });
-
-    const filteredMessages = validationResult.messages.filter(
-      (message) =>
-        !(
-          (message.message.includes('Trailing slash on void elements has no effect') && message.type === 'info') ||
-          (message.message.includes('Consider adding a "lang" attribute') && message.subType === 'warning')
-        ),
+  private async getUserByEmailWithCache(email: string): Promise<any> {
+    return this.cacheService.getOrSet(
+      this.cachePrefixes.USER_BY_EMAIL,
+      email,
+      () => this.permissionsService.getUserByEmail(email),
+      this.cacheService.CACHE_TTL.MEDIUM
     );
-
-    if (filteredMessages.length > 0) {
-      throw new CustomHttpException(
-        {
-          message: SYS_MSG.EMAIL_TEMPLATES.INVALID_HTML_FORMAT,
-          validation_errors: filteredMessages.map((msg) => msg.message),
-        },
-        HttpStatus.BAD_REQUEST,
-      );
-    }
-
-    const templatePath = `./src/modules/email/templates/${templateName}.hbs`;
-
-    if (!fs.existsSync(templatePath)) {
-      throw new CustomHttpException(SYS_MSG.EMAIL_TEMPLATES.TEMPLATE_NOT_FOUND, HttpStatus.NOT_FOUND);
-    }
-
-    await promisify(fs.writeFile)(templatePath, html, 'utf-8');
-
-    return {
-      status_code: HttpStatus.OK,
-      message: SYS_MSG.EMAIL_TEMPLATES.TEMPLATE_UPDATED_SUCCESSFULLY,
-      data: {
-        name: templateName,
-        content: html,
-      },
-    };
   }
 
-  async getTemplate(templateInfo: getTemplateDto) {
-    try {
-      const template = await getFile(`./src/modules/email/templates/${templateInfo.templateName}.hbs`, 'utf-8');
-
-      return {
-        status_code: HttpStatus.OK,
-        message: 'Template retrieved successfully',
-        template: template,
-      };
-    } catch (error) {
-      return {
-        status_code: HttpStatus.NOT_FOUND,
-        message: 'Template not found',
-      };
+  private async processFileAttachments(files: Express.Multer.File[]): Promise<EmailAttachment[]> {
+    if (!files || files.length === 0) {
+      return [];
     }
+    // Parallel upload to Cloudinary for better performance
+    const cloudinaryPromises = files.map(file =>
+      this.cloudinaryService.uploadFile(file, 'email-attachments')
+    );
+    const cloudinaryUrls = await Promise.all(cloudinaryPromises);
+    return files.map((file, index) => ({
+      originalname: file.originalname,
+      size: file.size,
+      mimetype: file.mimetype,
+      cloudinaryUrl: cloudinaryUrls[index],
+      buffer: file.buffer,
+    }));
   }
 
-  async deleteTemplate(templateInfo: getTemplateDto) {
+
+  async sendEmail(userId: string, fromEmail: string, sendEmailDto: SendEmailDto, files: Express.Multer.File[] = []) {
+    this.logger.debug(`Attempting to send email from ${fromEmail} to ${sendEmailDto.to}`);
+
     try {
-      await deleteFile(`./src/modules/email/templates/${templateInfo.templateName}.hbs`);
-      return {
-        status_code: HttpStatus.OK,
-        message: 'Template deleted successfully',
-      };
-    } catch (error) {
-      return {
-        status_code: HttpStatus.NOT_FOUND,
-        message: 'Template not found',
-      };
-    }
-  }
+      const user = await this.getUserWithCache(userId);
+      if (!fromEmail) fromEmail = user.email;
+      if (!user.email) throw new Error('User email not found');
 
-  async getAllTemplates() {
-    try {
-      const templatesDirectory = './src/modules/email/templates';
-      const files = await promisify(fs.readdir)(templatesDirectory);
+      // Process attachments asynchronously for better performance
+      const emailAttachments = await this.processFileAttachments(files);
 
-      const templates = await Promise.all(
-        files.map(async (file) => {
-          if (path.extname(file) !== '.hbs') return null;
+      // Format the from field
+      const formattedFrom = user.name ? `"${user.name}" <${fromEmail}>` : fromEmail;
 
-          const file_path = path.join(templatesDirectory, file);
-          const content = await promisify(fs.readFile)(file_path, 'utf-8');
+      const recipientEmail = this.extractEmail(sendEmailDto.to);
 
-          return {
-            template_name: path.basename(file),
-            content: content,
-          };
+      // Find recipient user (with caching)
+      const recipientUser = await this.getUserByEmailWithCache(recipientEmail);
+      if (!recipientUser) throw new Error(`Recipient user not found: ${recipientEmail}`);
+
+      // Prepare both emails for batch insertion
+      const sentEmail = this.emailRepository.create({
+        userId,
+        from: formattedFrom,
+        to: sendEmailDto.to,
+        subject: sendEmailDto.subject,
+        body: sendEmailDto.body,
+        folder: 'sent',
+        attachments: emailAttachments.map(({ buffer, ...metadata }) => metadata),
+        ownerEmail: fromEmail,
+      });
+
+      const receivedEmail = this.emailRepository.create({
+        userId: recipientUser.id,
+        from: formattedFrom,
+        to: sendEmailDto.to,
+        subject: sendEmailDto.subject,
+        body: sendEmailDto.body,
+        folder: 'inbox',
+        attachments: emailAttachments.map(({ buffer, ...metadata }) => metadata),
+        ownerEmail: recipientEmail,
+      });
+
+      // Prepare mailer attachments format 
+      const mailerAttachments = emailAttachments.map(attachment => ({
+        filename: attachment.originalname,
+        content: attachment.buffer,
+        contentType: attachment.mimetype,
+      }));
+
+      // Send email and save to database concurrently for better performance
+      const [emailResult] = await Promise.all([
+        this.mailerService.sendMail({
+          to: sendEmailDto.to,
+          from: formattedFrom,
+          replyTo: fromEmail,
+          subject: sendEmailDto.subject,
+          html: sendEmailDto.body,
+          cc: sendEmailDto.cc,
+          bcc: sendEmailDto.bcc,
+          attachments: mailerAttachments,
         }),
-      );
+        this.emailRepository.save([sentEmail, receivedEmail])
+      ]);
 
-      const validTemplates = templates.filter((template) => template !== null);
+      // Send notification to recipient
+      await this.notificationService.sendEmailNotification(recipientUser.id, {
+        subject: sendEmailDto.subject,
+        from: formattedFrom,
+        preview: sendEmailDto.body.substring(0, 100) + '...',
+      });
+
+      this.logger.debug('Email sent and stored successfully');
+      return { success: true, message: 'Email sent successfully', email: sentEmail };
+    } catch (error) {
+      this.logger.error(`Error sending email: ${error.message}`, error.stack);
+      throw new Error(`Failed to send email: ${error.message}`);
+    }
+  }
+
+
+  async getEmails(userId: string, userEmail: string, options: { page: number; limit: number; folder: string }) {
+    const { folder } = options;
+
+    try {
+      const user = await this.permissionsService.getUserById(userId);
+
+      // For inbox, get emails where the user is the recipient
+      // For sent, get emails where the user is the sender
+      // For trash, get emails where the user is either sender or recipient
+      const whereClause = folder === 'inbox'
+        ? { to: user.email, folder: 'inbox' }
+        : folder === 'sent'
+          ? { from: Like(`%${user.email}%`), folder: 'sent' }
+          : { folder: 'trash', userId: user.id };
+
+      return this.paginationService.paginate(
+        this.emailRepository,
+        whereClause,
+        {
+          ...options,
+          order: { created_at: 'DESC' },
+        }
+      );
+    } catch (error) {
+      this.logger.error(`Error getting emails: ${error.message}`, error.stack);
+      throw error;
+    }
+  }
+
+  async getEmail(id: string, userId: string, userEmail: string) {
+    try {
+      const user = await this.getUserWithCache(userId);
+
+      const email = await this.emailRepository.createQueryBuilder('email')
+        .where('email.id = :id', { id })
+        .andWhere(
+          '(email.to = :userEmail OR email.from LIKE :fromPattern)',
+          { userEmail: user.email, fromPattern: `%${user.email}%` }
+        )
+        .getOne();
+
+      if (!email) throw new NotFoundException(`Email with ID ${id} not found`);
+
+      return email;
+    } catch (error) {
+      this.logger.error(`Error in getEmail: ${error.message}`, error.stack);
+      if (error instanceof NotFoundException) {
+        throw error;
+      }
+      throw new NotFoundException(`Error accessing email: ${error.message}`);
+    }
+  }
+
+  async replyToEmail(id: string, userId: string, fromEmail: string, replyEmailDto: ReplyEmailDto, files?: Express.Multer.File[]) {
+    try {
+      // Get user and original email concurrently
+      const [user, originalEmail] = await Promise.all([
+        this.getUserWithCache(userId),
+        this.getEmail(id, userId, fromEmail)
+      ]);
+
+      const originalSenderEmail = this.extractEmail(originalEmail.from);
+
+      // Prepare reply content
+      const replySubject = originalEmail.subject.startsWith('Re:')
+        ? originalEmail.subject
+        : `Re: ${originalEmail.subject}`;
+
+      const replyBody = `
+        ${replyEmailDto.body}
+        
+        <hr>
+        <p>On ${originalEmail.created_at.toLocaleString()}, ${originalEmail.from} wrote:</p>
+        ${originalEmail.body}
+      `;
+
+      // Send reply
+      const sendEmailDto = new SendEmailDto();
+      sendEmailDto.to = originalSenderEmail;
+      sendEmailDto.subject = replySubject;
+      sendEmailDto.body = replyBody;
+      sendEmailDto.attachments = replyEmailDto.attachments;
+      sendEmailDto.cc = replyEmailDto.cc;
+      sendEmailDto.bcc = replyEmailDto.bcc;
+
+      return this.sendEmail(userId, user.email, sendEmailDto, files);
+    } catch (error) {
+      this.logger.error(`Error in replyToEmail: ${error.message}`, error.stack);
+      throw error;
+    }
+  }
+
+  async deleteEmail(id: string, userId: string, userEmail: string) {
+    try {
+
+      await this.emailRepository
+        .createQueryBuilder()
+        .update(EmailAccount)
+        .set({ folder: 'trash' })
+        .where('id = :id', { id })
+        .andWhere('userId = :userId', { userId })
+        .execute();
+
+      return { success: true, message: 'Email moved to trash' };
+    } catch (error) {
+      this.logger.error(`Error deleting email: ${error.message}`, error.stack);
+      throw error;
+    }
+  }
+
+  async permanentlyDeleteEmail(id: string, userId: string, userEmail: string) {
+    try {
+      const email = await this.getEmail(id, userId, userEmail);
+
+      if (email.folder !== 'trash') throw new Error('Email must be in trash before permanent deletion');
+
+      await this.emailRepository
+        .createQueryBuilder()
+        .delete()
+        .from(EmailAccount)
+        .where('id = :id', { id })
+        .andWhere('userId = :userId', { userId })
+        .execute();
+
+      return { success: true, message: 'Email permanently deleted' };
+    } catch (error) {
+      this.logger.error(`Error permanently deleting email: ${error.message}`, error.stack);
+      throw error;
+    }
+  }
+
+  async emptyTrash(userId: string, userEmail: string) {
+    try {
+
+      const result = await this.emailRepository
+        .createQueryBuilder()
+        .delete()
+        .from(EmailAccount)
+        .where('folder = :folder', { folder: 'trash' })
+        .andWhere('userId = :userId', { userId })
+        .execute();
+
       return {
-        status_code: HttpStatus.OK,
-        message: 'Templates retrieved successfully',
-        templates: validTemplates,
+        success: true,
+        message: `Successfully deleted ${result.affected} emails from trash`
       };
     } catch (error) {
-      return {
-        status_code: HttpStatus.NOT_FOUND,
-        message: 'Template not found',
-      };
+      this.logger.error(`Error emptying trash: ${error.message}`, error.stack);
+      throw error;
     }
   }
 }

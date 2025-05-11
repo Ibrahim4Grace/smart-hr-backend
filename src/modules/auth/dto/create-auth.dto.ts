@@ -1,29 +1,6 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { IsEmail, IsEnum, IsNotEmpty, IsString, MinLength, IsStrongPassword } from 'class-validator';
-import { registerDecorator, ValidationArguments, ValidationOptions } from 'class-validator';
-
-export function Match(property: string, validationOptions?: ValidationOptions) {
-  return (object: any, propertyName: string) => {
-    registerDecorator({
-      name: 'Match',
-      target: object.constructor,
-      propertyName,
-      constraints: [property],
-      options: validationOptions,
-      validator: {
-        validate(value: any, args: ValidationArguments) {
-          const [relatedPropertyName] = args.constraints;
-          const relatedValue = (args.object as any)[relatedPropertyName];
-          return value === relatedValue;
-        },
-        defaultMessage(args: ValidationArguments) {
-          const [relatedPropertyName] = args.constraints;
-          return `${propertyName} must match ${relatedPropertyName}`;
-        },
-      },
-    });
-  };
-}
+import { IsEmail, IsNotEmpty, IsString, MinLength, IsStrongPassword } from 'class-validator';
+import { Transform } from 'class-transformer';
 
 export class CreateAuthDto {
   @ApiProperty({
@@ -39,6 +16,7 @@ export class CreateAuthDto {
     example: 'user@example.com',
   })
   @IsEmail()
+  @Transform(({ value }) => value.trim().toLowerCase())
   email: string;
 
   @ApiProperty({
@@ -58,15 +36,6 @@ export class CreateAuthDto {
     },
   )
   password: string;
-
-  @ApiProperty({
-    description: 'Confirm the password for the user account. Must match the password field.',
-    example: 'P@ssw0rd!',
-  })
-  @IsNotEmpty()
-  @IsString()
-  @Match('password', { message: 'Password and confirm password must match' })
-  confirm_password: string;
 }
 
 export class AuthResponseDto {
@@ -102,6 +71,7 @@ export class ForgotPasswordDto {
   })
   @IsEmail()
   @IsNotEmpty()
+  @Transform(({ value }) => value.trim().toLowerCase())
   email: string;
 }
 
@@ -119,14 +89,6 @@ export class UpdatePasswordDto {
     },
   )
   new_password: string;
-
-  @ApiProperty({
-    description: 'Confirm the password of the user',
-  })
-  @MinLength(8)
-  @IsNotEmpty()
-  @Match('new_password', { message: 'Password and confirm password must match' })
-  confirm_password?: string;
 }
 
 export class UserDto {
@@ -146,6 +108,7 @@ export class UserDto {
     description: 'Email address of the user',
     example: 'john.doe@example.com',
   })
+  @Transform(({ value }) => value.trim().toLowerCase())
   email: string;
 }
 
@@ -190,6 +153,7 @@ export class LoginDto {
   })
   @IsNotEmpty()
   @IsEmail()
+  @Transform(({ value }) => value.trim().toLowerCase())
   readonly email: string;
 
   @ApiProperty({

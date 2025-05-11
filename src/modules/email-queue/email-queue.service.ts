@@ -1,4 +1,4 @@
-import { HttpStatus, Injectable } from '@nestjs/common';
+import { HttpStatus, Injectable, Logger } from '@nestjs/common';
 import Handlebars from 'handlebars';
 import * as htmlValidator from 'html-validator';
 import * as fs from 'fs';
@@ -10,12 +10,20 @@ import { MailInterface } from './interface/email-queue.interface';
 import { CustomHttpException } from '@shared/helpers/custom-http-filter';
 import * as SYS_MSG from '@shared/constants/SystemMessages';
 import { getFile, createFile, deleteFile } from '@shared/helpers/fileHelpers';
-import { Logger } from '@nestjs/common';
+
+import { ConfigService } from '@nestjs/config';
 
 @Injectable()
 export class EmailQueueService {
   private readonly logger = new Logger(EmailQueueService.name);
-  constructor(private readonly mailerService: QueueService) { }
+  private readonly frontendUrl: string;
+
+  constructor(
+    private readonly mailerService: QueueService,
+    private readonly configService: ConfigService,
+  ) {
+    this.frontendUrl = this.configService.get<string>('auth.frontendUrl');
+  }
 
   async sendUserEmailConfirmationOtp(email: string, name: string, otp: string) {
     const mailPayload: MailInterface = {
@@ -111,6 +119,31 @@ export class EmailQueueService {
 
     await this.mailerService.sendMail({
       variant: 'reactivate-notification',
+      mail: mailPayload,
+    });
+  }
+
+  async sendEmployeeOnboardingEmail(
+    email: string,
+    firstName: string,
+    lastName: string,
+    password: string,
+    company: string,
+  ) {
+    const mailPayload: MailInterface = {
+      to: email,
+      context: {
+        firstName,
+        lastName,
+        email,
+        password,
+        company,
+        loginUrl: this.frontendUrl,
+      },
+    };
+
+    await this.mailerService.sendMail({
+      variant: 'employee-onboarding',
       mail: mailPayload,
     });
   }

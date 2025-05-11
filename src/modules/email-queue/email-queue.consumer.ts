@@ -123,4 +123,23 @@ export default class EmailQueueConsumer {
       this.logger.error(`Reactivation email failed for ${job.data.mail.to}`, error.stack);
     }
   }
+
+  @Process('employee-onboarding')
+  async sendEmployeeOnboardingEmail(job: Job<MailInterface>) {
+    try {
+      const { mail } = job.data;
+      this.logger.log(`Processing employee onboarding email job for ${mail.to} with context: ${JSON.stringify(mail.context)}`);
+
+      await this.mailerService.sendMail({
+        ...mail,
+        subject: `Welcome to ${mail.context.company}!`,
+        template: 'employee-onboarding',
+      });
+
+      this.logger.log(`Employee onboarding email sent successfully to ${mail.to}`);
+    } catch (error) {
+      this.logger.error(`Employee onboarding email failed for ${job.data.mail.to}`, error.stack);
+      throw error;
+    }
+  }
 }

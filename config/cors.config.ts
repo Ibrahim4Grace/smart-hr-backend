@@ -1,4 +1,4 @@
-import { CorsOptions } from '@nestjs/common/interfaces/external/cors-options.interface';
+
 
 export default () => {
   const whitelist = (process.env.CORS_WHITELIST || '').split(',');

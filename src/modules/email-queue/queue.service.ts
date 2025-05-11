@@ -29,5 +29,6 @@ export interface MailSender {
   | 'forgot-otp'
   | 'reset-successful'
   | 'deactivate-notification'
-  | 'reactivate-notification';
+  | 'reactivate-notification'
+  | 'employee-onboarding';
 }

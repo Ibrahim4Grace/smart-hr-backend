@@ -1,22 +1,61 @@
-import { Entity, Column, ManyToOne } from 'typeorm';
+import { Entity, Column, ManyToOne, JoinColumn, Index } from 'typeorm';
 import { AbstractBaseEntity } from '../../../entities/base.entity';
-import { Employee } from '../../employee/entities/employee.entity';
-import { Project } from '../../project/entities/project.entity';
+import { User } from '../../user/entities/user.entity';
+
+export enum TodoPriority {
+  LOW = 'Low',
+  MEDIUM = 'Medium',
+  HIGH = 'High'
+}
+
+export enum TodoStatus {
+  PENDING = 'Pending',
+  IN_PROGRESS = 'Inprogress',
+  ON_HOLD = 'Onhold',
+  COMPLETED = 'Completed'
+}
+
+export enum TodoTag {
+  INTERNAL = 'Internal',
+  PROJECTS = 'Projects',
+  MEETINGS = 'Meetings',
+  REMINDER = 'Reminder'
+}
 
 @Entity('todos')
 export class Todo extends AbstractBaseEntity {
-  @Column({ length: 500 })
+  @Column({ length: 255 })
+  title: string;
+
+  @Column({ type: 'text' })
   description: string;
 
-  @Column({ type: 'date' })
-  dueDate: Date;
+  @Column({
+    type: 'enum',
+    enum: TodoTag,
+    default: TodoTag.INTERNAL
+  })
+  tag: TodoTag;
 
-  @Column({ length: 50, default: 'Pending' })
-  status: string; // e.g., Pending, In Progress, Completed
+  @Column({
+    type: 'enum',
+    enum: TodoPriority,
+    default: TodoPriority.MEDIUM
+  })
+  priority: TodoPriority;
 
-  @ManyToOne(() => Employee, (employee) => employee.attendances)
-  assignedTo: Employee;
+  @Column({
+    type: 'enum',
+    enum: TodoStatus,
+    default: TodoStatus.PENDING
+  })
+  status: TodoStatus;
 
-  @ManyToOne(() => Project, (project) => project.employees)
-  project: Project;
+  @Column({ type: 'text' })
+  assigned_to: string;
+
+  @Index()
+  @ManyToOne(() => User, user => user.todos)
+  @JoinColumn({ name: 'user_id' })
+  user: User;
 }

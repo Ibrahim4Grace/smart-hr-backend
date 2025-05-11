@@ -1,5 +1,5 @@
 import { UpdateRecordGeneric } from '@shared/helpers/UpdateRecordGeneric';
-import { UserRole } from '../enum/user.role';
+import { UserRole } from '@modules/auth/interfaces/auth.interface';
 
 export interface UserPayload {
   userId: string;
@@ -12,8 +12,6 @@ export interface UserPayload {
 
 export interface UserInterface {
   id: string;
-
-  pronouns: string;
 
   email: string;
 
@@ -44,10 +42,10 @@ export type UpdateUserRecordOption = UpdateRecordGeneric<UserIdentifierOptionsTy
 
 export type UserIdentifierOptionsType =
   | {
-      identifierType: 'id';
-      identifier: string;
-    }
+    identifierType: 'id';
+    identifier: string;
+  }
   | {
-      identifierType: 'email';
-      identifier: string;
-    };
+    identifierType: 'email';
+    identifier: string;
+  };

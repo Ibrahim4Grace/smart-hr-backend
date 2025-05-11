@@ -6,28 +6,19 @@ import { UserController } from './user.controller';
 import { Role } from '@modules/role/entities/role.entity';
 import { User } from './entities/user.entity';
 import { PasswordService } from '../auth/password.service';
-import { JwtModule } from '@nestjs/jwt';
-import { ConfigModule, ConfigService } from '@nestjs/config';
-import { EmailService } from '@modules/email/email.service';
-import { EmailModule } from '@modules/email/email.module';
+import { EmailQueueService } from '@modules/email-queue/email-queue.service';
+import { EmailQueueModule } from '@modules/email-queue/email-queue.module';
+import { CloudinaryService } from '@shared/services/cloudinary.service';
+import { SharedModule } from '@shared/shared.module';
 
 @Module({
   controllers: [UserController],
-  providers: [UserService, Repository, PasswordService, EmailService],
+  providers: [UserService, Repository, PasswordService, EmailQueueService, CloudinaryService],
   imports: [
     TypeOrmModule.forFeature([User, Role]),
-    EmailModule,
-    JwtModule.registerAsync({
-      imports: [ConfigModule],
-      useFactory: async (configService: ConfigService) => ({
-        secret: configService.get<string>('JWT_AUTH_SECRET'),
-        signOptions: {
-          expiresIn: configService.get<string>('JWT_AUTH_EXPIRES_IN'),
-        },
-      }),
-      inject: [ConfigService],
-    }),
+    SharedModule,
+    EmailQueueModule,
   ],
   exports: [UserService],
 })
-export class UserModule {}
+export class UserModule { }

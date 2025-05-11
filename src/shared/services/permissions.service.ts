@@ -15,7 +15,10 @@ export class EntityPermissionsService {
      * Check if a user has permission to access an entity
      */
     canAccessEntity(entity: any, user: User): boolean {
-        // Check if entity has a user property with an id
+        // For employees, check if the user is the HR who added them
+        if (entity?.added_by_hr?.id) return entity.added_by_hr.id === user.id;
+
+        // For other entities, check if entity has a user property with an id
         if (entity?.user?.id) return entity.user.id === user.id;
 
         return false;
@@ -57,6 +60,7 @@ export class EntityPermissionsService {
         }
     }
 
+    //can be used to get an entity with permission check
     async getEntityWithPermissionCheck<T>(
         entityClass: EntityTarget<T>,
         entityId: string,

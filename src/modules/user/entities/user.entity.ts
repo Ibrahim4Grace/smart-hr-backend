@@ -1,18 +1,23 @@
-import { Column, Entity, OneToMany, OneToOne, JoinColumn } from 'typeorm';
+import { Column, Entity, OneToMany } from 'typeorm';
 import { AbstractBaseEntity } from '../../../entities/base.entity';
 import { Subscription } from '../../subscription/entities/subscription.entity';
-import { Employee } from '../../employee/entities/employee.entity';
-import { UserRole } from '../enum/user.role';
-import { Profile } from '../../profile/entities/profile.entity';
+import { UserRole } from '@modules/auth/interfaces/auth.interface';
+import { Todo } from '@modules/todo/entities/todo.entity';
+import { Calendar } from '@modules/calendar/entities/calendar.entity';
+import { Exclude } from 'class-transformer';
+import { Note } from '@modules/notes/entities/note.entity';
+import { Invoice } from '@modules/invoice/entities/invoice.entity';
 
 @Entity({ name: 'users' })
 export class User extends AbstractBaseEntity {
+
   @Column({ nullable: false })
   name: string;
 
   @Column({ nullable: false, unique: true })
   email: string;
 
+  @Exclude()
   @Column({ nullable: false })
   password: string;
 
@@ -21,6 +26,9 @@ export class User extends AbstractBaseEntity {
 
   @Column({ nullable: true })
   address: string;
+
+  @Column({ nullable: true })
+  company: string;
 
   @Column({ nullable: true })
   deactivation_reason: string;
@@ -40,8 +48,11 @@ export class User extends AbstractBaseEntity {
   @Column({ type: 'timestamp', nullable: true })
   reactivated_at: Date;
 
-  @Column({ type: 'enum', enum: UserRole, default: UserRole.USER })
+  @Column({ type: 'enum', enum: UserRole, default: UserRole.HR })
   role: UserRole;
+
+  @Column({ nullable: true })
+  hr_profile_pic_url: string;
 
   @Column({ default: false })
   emailVerified: boolean;
@@ -52,19 +63,23 @@ export class User extends AbstractBaseEntity {
   @Column({ default: false })
   is_active: boolean;
 
-  @OneToOne(() => Profile, (profile) => profile.user, {
-    cascade: true, // Auto save/update/delete profile
-    onDelete: 'CASCADE', // DB-level cascade
+  @OneToMany(() => Todo, (todo) => todo.user, {
+    cascade: true,
   })
-  profile: Profile;
+  todos: Todo[];
+
+  @OneToMany(() => Calendar, (calendar) => calendar.user)
+  calendars: Calendar[];
+
+  @OneToMany(() => Note, (note) => note.user)
+  notes: Note[];
+
+  @OneToMany(() => Invoice, (invoice) => invoice.user)
+  invoices: Invoice[];
 
   @OneToMany(() => Subscription, (subscription) => subscription.user, {
     cascade: true,
   })
   subscriptions: Subscription[];
 
-  @OneToMany(() => Employee, (employee) => employee.user, {
-    cascade: true,
-  })
-  employees: Employee[]; // Only if users can have multiple employee profiles or if this is a 1:1 relationship
 }

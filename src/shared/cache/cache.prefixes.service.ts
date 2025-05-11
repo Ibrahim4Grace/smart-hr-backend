@@ -11,6 +11,9 @@ export class CachePrefixesService {
     readonly USER = 'user';
     readonly USER_BY_EMAIL = 'user:email';
 
+    // Employee-related cache prefixes
+    readonly EMPLOYEE = 'employee';
+    readonly EMPLOYEE_LIST = 'employee:list';
 
     // Email-related cache prefixes
     readonly EMAIL = 'email';

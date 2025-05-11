@@ -8,7 +8,7 @@ const isDevelopment = process.env.NODE_ENV === 'development';
 const dataSource = new DataSource({
   type: process.env.DB_TYPE as 'postgres',
   url: process.env.DB_URL ?? '',
-  entities: process.env.DB_ENTITIES ? [process.env.DB_ENTITIES] : ['dist/**/*.entity{.ts,.js}'],
+  entities: ['dist/**/*.entity{.ts,.js}'],
   migrations: process.env.DB_MIGRATIONS ? [process.env.DB_MIGRATIONS] : ['dist/migrations/*{.ts,.js}'],
   synchronize: isDevelopment,
   migrationsTableName: 'migrations',

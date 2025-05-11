@@ -1,26 +1,248 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, BadRequestException, HttpStatus } from '@nestjs/common';
+import { InjectRepository } from '@nestjs/typeorm';
+import { Repository } from 'typeorm';
 import { CreateEmployeeDto } from './dto/create-employee.dto';
 import { UpdateEmployeeDto } from './dto/update-employee.dto';
+import { Employee } from './entities/employee.entity';
+import { User } from '../user/entities/user.entity';
+import { EntityPermissionsService } from '../../shared/services/permissions.service';
+import { PaginationOptions } from '@shared/interfaces/pagination.interface';
+import { PaginationService } from '@shared/services/pagination.service';
+import { CustomHttpException } from '@shared/helpers/custom-http-filter';
+import * as SYS_MSG from '@shared/constants/SystemMessages';
+import { CloudinaryService } from '@shared/services/cloudinary.service';
+import { UploadProfilePicDto } from './dto/upload-profile-pic.dto';
+import { Logger } from '@nestjs/common';
+import { CacheService } from '@shared/cache/cache.service';
+import { CachePrefixesService } from '@shared/cache/cache.prefixes.service';
+import { PasswordService } from '../auth/password.service';
+import { EmailQueueService } from '../email-queue/email-queue.service';
+import { ChangePasswordDto } from './dto/change-password.dto';
+import { timestamp } from '@utils/time';
 
 @Injectable()
 export class EmployeesService {
-  create(createEmployeeDto: CreateEmployeeDto) {
-    return 'This action adds a new employee';
+  private readonly logger = new Logger(EmployeesService.name);
+
+  constructor(
+    @InjectRepository(Employee)
+    private employeeRepository: Repository<Employee>,
+    private permissionsService: EntityPermissionsService,
+    private paginationService: PaginationService,
+    private cloudinaryService: CloudinaryService,
+    private cacheService: CacheService,
+    private cachePrefixes: CachePrefixesService,
+    private passwordService: PasswordService,
+    private emailQueueService: EmailQueueService,
+  ) { }
+
+  async getEmployeeById(userId: string) {
+    const employee = await this.employeeRepository.findOne({
+      where: { id: userId }
+    });
+    return employee;
   }
 
-  findAll() {
-    return `This action returns all employees`;
+
+  async create(createEmployeeDto: CreateEmployeeDto, userId: string) {
+    const user = await this.permissionsService.getUserById(userId);
+    const plainPassword = createEmployeeDto.password;
+    const hashedPassword = await this.passwordService.hashPassword(createEmployeeDto.password);
+
+    const employee = this.employeeRepository.create({
+      ...createEmployeeDto,
+      password: hashedPassword,
+      added_by_hr: user,
+    });
+
+    try {
+      const savedEmployee = await this.employeeRepository.save(employee);
+
+      await this.emailQueueService.sendEmployeeOnboardingEmail(
+        savedEmployee.email,
+        savedEmployee.first_name,
+        savedEmployee.last_name,
+        plainPassword,
+        savedEmployee.company
+      );
+
+      await this.cacheService.deleteByPrefix(this.cachePrefixes.EMPLOYEE_LIST);
+
+      return savedEmployee;
+    } catch (error) {
+      this.logger.error(`Failed to create employee: ${error.message}`, error.stack);
+      throw new BadRequestException('Failed to create employee');
+    }
   }
 
-  findOne(id: number) {
-    return `This action returns a #${id} employee`;
+  async findAll(paginationOptions: PaginationOptions<Employee>, userId: string) {
+    const user = await this.permissionsService.getUserById(userId);
+    const cacheKey = `${userId}:${JSON.stringify(paginationOptions)}`;
+
+    return this.cacheService.getOrSet(
+      this.cachePrefixes.EMPLOYEE_LIST,
+      cacheKey,
+      async () => {
+        return this.paginationService.paginate(
+          this.employeeRepository,
+          { added_by_hr: { id: user.id } },
+          {
+            ...paginationOptions,
+            relations: ['added_by_hr'],
+          }
+        );
+      },
+      this.cacheService.CACHE_TTL.MEDIUM
+    );
   }
 
-  update(id: number, updateEmployeeDto: UpdateEmployeeDto) {
-    return `This action updates a #${id} employee`;
+  async findOne(id: string, userId: string) {
+    const user = await this.permissionsService.getUserById(userId);
+
+    return this.cacheService.getOrSet(
+      this.cachePrefixes.EMPLOYEE,
+      `${id}:${userId}`,
+      async () => {
+        const employee = await this.permissionsService.getEntityWithPermissionCheck(
+          Employee,
+          id,
+          user,
+          ['added_by_hr']
+        );
+
+        if (!employee) throw new CustomHttpException(SYS_MSG.EMPLOYEE_NOT_FOUND, HttpStatus.NOT_FOUND);
+
+        return employee;
+      },
+      this.cacheService.CACHE_TTL.MEDIUM
+    );
   }
 
-  remove(id: number) {
-    return `This action removes a #${id} employee`;
+  async update(employeeId: string, updateEmployeeDto: UpdateEmployeeDto, userId: string) {
+    const employee = await this.employeeRepository.findOne({ where: { id: employeeId } });
+    if (!employee) throw new CustomHttpException(SYS_MSG.EMPLOYEE_NOT_FOUND, HttpStatus.NOT_FOUND);
+
+    if (employee.id !== userId) {
+      throw new CustomHttpException(SYS_MSG.FORBIDDEN_ACTION, HttpStatus.FORBIDDEN);
+    }
+
+    const updatedEmployee = { ...employee, ...updateEmployeeDto };
+    const savedEmployee = await this.employeeRepository.save(updatedEmployee);
+
+    await Promise.all([
+      this.cacheService.delete(this.cachePrefixes.EMPLOYEE, employeeId),
+      this.cacheService.deleteByPrefix(this.cachePrefixes.EMPLOYEE_LIST)
+    ]);
+
+    return savedEmployee;
+  }
+
+  async remove(id: string, userId: string) {
+    const hrUser = await this.permissionsService.getUserById(userId);
+
+    const employeeToDelete = await this.employeeRepository.findOne({
+      where: { id },
+      relations: ['added_by_hr']
+    });
+
+    if (!employeeToDelete) {
+      throw new CustomHttpException(SYS_MSG.EMPLOYEE_NOT_FOUND, HttpStatus.NOT_FOUND);
+    }
+
+    if (employeeToDelete.added_by_hr.id !== hrUser.id) {
+      throw new CustomHttpException(SYS_MSG.FORBIDDEN_ACTION, HttpStatus.FORBIDDEN);
+    }
+
+    await this.employeeRepository.remove(employeeToDelete);
+
+    await Promise.all([
+      this.cacheService.delete(this.cachePrefixes.EMPLOYEE, id),
+      this.cacheService.deleteByPrefix(this.cachePrefixes.EMPLOYEE_LIST)
+    ]);
+
+    return { message: 'Employee deleted successfully' };
+  }
+
+  async uploadProfilePicture(
+    employeeId: string,
+    uploadProfilePicDto: UploadProfilePicDto,
+  ): Promise<{ status: string; message: string; data: { avatar_url: string } }> {
+    if (!uploadProfilePicDto.avatar) throw new CustomHttpException(SYS_MSG.NO_FILE_FOUND, HttpStatus.BAD_REQUEST);
+
+    const employee = await this.employeeRepository.findOne({
+      where: { id: employeeId },
+      select: ['id', 'employee_profile_pic_url']
+    });
+    if (!employee) throw new CustomHttpException(SYS_MSG.EMPLOYEE_NOT_FOUND, HttpStatus.NOT_FOUND);
+
+    if (employee.id !== employeeId) {
+      throw new CustomHttpException(SYS_MSG.FORBIDDEN_ACTION, HttpStatus.FORBIDDEN);
+    }
+
+    try {
+      if (employee.employee_profile_pic_url) {
+        const publicId = this.cloudinaryService.getPublicIdFromUrl(employee.employee_profile_pic_url);
+        await this.cloudinaryService.deleteFile(publicId);
+      }
+
+      const avatarUrl = await this.cloudinaryService.uploadFile(uploadProfilePicDto.avatar, 'employee-profile-pictures');
+
+      employee.employee_profile_pic_url = avatarUrl;
+      await this.employeeRepository.save(employee);
+
+      await this.cacheService.delete(this.cachePrefixes.EMPLOYEE, employeeId);
+
+      return {
+        status: 'success',
+        message: SYS_MSG.PICTURE_UPDATED,
+        data: { avatar_url: avatarUrl },
+      };
+    } catch (error) {
+      this.logger.error(`Failed to upload profile picture: ${error.message}`, error.stack);
+      throw new CustomHttpException(
+        `Failed to upload profile picture: ${error.message}`,
+        HttpStatus.INTERNAL_SERVER_ERROR,
+      );
+    }
+  }
+
+  async changePassword(employeeId: string, changePasswordDto: ChangePasswordDto) {
+    const employee = await this.employeeRepository.findOne({
+      where: { id: employeeId },
+      select: ['id', 'password', 'email', 'first_name', 'last_name']
+    });
+
+    if (!employee) throw new CustomHttpException(SYS_MSG.EMPLOYEE_NOT_FOUND, HttpStatus.NOT_FOUND);
+
+    if (employee.id !== employeeId) throw new CustomHttpException(SYS_MSG.FORBIDDEN_ACTION, HttpStatus.FORBIDDEN);
+
+    const isPasswordValid = await this.passwordService.comparePassword(
+      changePasswordDto.currentPassword,
+      employee.password
+    );
+
+    if (!isPasswordValid) throw new CustomHttpException(SYS_MSG.INVALID_CURRENT_PWD, HttpStatus.BAD_REQUEST);
+    const hashedPassword = await this.passwordService.hashPassword(changePasswordDto.newPassword);
+    employee.password = hashedPassword;
+
+    try {
+      await this.employeeRepository.update(employeeId, { password: hashedPassword });
+
+      Promise.all([
+        this.cacheService.delete(this.cachePrefixes.EMPLOYEE, employeeId),
+        this.emailQueueService.sendPasswordChangedMail(employee.email, employee.name, timestamp)
+      ]).catch(error => {
+        this.logger.error(`Background tasks after password change failed: ${error.message}`, error.stack);
+      });
+
+      return {
+        message: SYS_MSG.PASSWORD_UPDATED,
+        status: 'success'
+      };
+    } catch (error) {
+      this.logger.error(`Failed to change password: ${error.message}`, error.stack);
+      throw new CustomHttpException(SYS_MSG.PASSWORD_CHANGE_FAILED, HttpStatus.INTERNAL_SERVER_ERROR);
+    }
   }
 }
+

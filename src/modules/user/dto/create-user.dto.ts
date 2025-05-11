@@ -1,6 +1,6 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { UserInterface } from '../interface/User.interface';
 import { IsEnum, IsString, IsBoolean, IsEmail, IsOptional, IsNotEmpty } from 'class-validator';
+import { UserInterface } from '../interface/user.interface';
 
 export class GetUserByIdResponseDto {
   status_code: 200;
@@ -29,9 +29,9 @@ export class GetUserStatsResponseDto {
     },
   })
   data: {
-    total_users: number;
-    active_users: number;
-    deleted_users: number;
+    total_hrs: number;
+    active_hrs: number;
+    deleted_hrs: number;
   };
 }
 
@@ -94,7 +94,7 @@ export class UpdateUserDto {
   name?: string;
 
   @ApiProperty({
-    description: 'The email of the user',
+    description: 'The email of the hr',
     example: 'example.com',
   })
   @IsOptional()
@@ -102,7 +102,7 @@ export class UpdateUserDto {
   email?: string;
 
   @ApiProperty({
-    description: 'The password of the user',
+    description: 'The password of the hr',
     example: 'password123',
   })
   @IsOptional()
@@ -110,7 +110,7 @@ export class UpdateUserDto {
   password?: string;
 
   @ApiProperty({
-    description: 'The phone number of the user',
+    description: 'The phone number of the hr',
     example: '1234567890',
   })
   @IsOptional()
@@ -118,7 +118,7 @@ export class UpdateUserDto {
   phone?: string;
 
   @ApiProperty({
-    description: 'The address of the user',
+    description: 'The address of the hr',
     example: '123 Main St, City, Country',
   })
   @IsOptional()

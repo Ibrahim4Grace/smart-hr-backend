@@ -1,5 +1,3 @@
-import { UserRole } from '../../user/enum/user.role';
-
 export interface CreateUserResponse {
   message: string;
   data: {
@@ -12,3 +10,11 @@ export interface CreateUserResponse {
     token: string;
   };
 }
+
+export const UserRole = {
+  SUPER_ADMIN: 'super_admin',
+  EMPLOYEE: 'employee',
+  HR: 'hr'
+} as const;
+
+export type UserRole = typeof UserRole[keyof typeof UserRole];

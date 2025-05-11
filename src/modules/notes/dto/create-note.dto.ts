@@ -4,23 +4,28 @@ import { Type } from 'class-transformer';
 import { ApiProperty } from '@nestjs/swagger';
 
 export class CreateNoteDto {
+    @ApiProperty({ description: 'Note title' })
     @IsString()
     @IsNotEmpty()
     @MaxLength(255)
     title: string;
 
+    @ApiProperty({ description: 'Note content' })
     @IsString()
     @IsNotEmpty()
     content: string;
 
+    @ApiProperty({ description: 'Note tags' })
     @IsArray()
     @IsString({ each: true })
     tags: string[];
 
+    @ApiProperty({ description: 'Note priority' })
     @IsEnum(NotePriority)
     @IsNotEmpty()
     priority: NotePriority;
 
+    @ApiProperty({ description: 'Note status' })
     @IsEnum(NoteStatus)
     @IsNotEmpty()
     status: NoteStatus;
@@ -30,7 +35,8 @@ export class CreateNoteDto {
     @Type(() => Date)
     dueDate: Date;
 
+    @ApiProperty({ description: 'Note assigned to' })
     @IsString()
     @IsNotEmpty()
-    assignee: string;
+    assigned_to: string;
 }

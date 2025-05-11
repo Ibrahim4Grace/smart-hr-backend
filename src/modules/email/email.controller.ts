@@ -1,58 +1,115 @@
-import { Controller, Post, Get, Body, Res, Patch, Param } from '@nestjs/common';
-import { Response } from 'express';
+import { Controller, Get, Post, Body, Patch, Param, Delete, Query, UseInterceptors, UploadedFiles, UseGuards } from '@nestjs/common';
 import { EmailService } from './email.service';
-import { UpdateTemplateDto, createTemplateDto, getTemplateDto } from './dto/email.dto';
-import { ApiOperation, ApiParam, ApiResponse, ApiTags } from '@nestjs/swagger';
-import {
-  GetTemplateResponseDto,
-  CreateTemplateResponseDto,
-  ErrorResponseDto,
-  UpdateTemplateResponseDto,
-  GetAllTemplatesResponseDto,
-} from './dto/email.dto';
+import { SendEmailDto } from './dto/send-email.dto';
+import { ReplyEmailDto } from './dto/reply-email.dto';
+import { ApiBearerAuth, ApiOperation, ApiResponse, ApiTags, ApiQuery, ApiConsumes } from '@nestjs/swagger';
+import { GetUser } from '@shared/decorators/user.decorator';
+import { FilesInterceptor } from '@nestjs/platform-express';
 
+
+@ApiTags('Email')
+@ApiBearerAuth()
 @Controller('email')
 export class EmailController {
-  constructor(private readonly emailService: EmailService) {}
+  constructor(
+    private readonly emailService: EmailService,
+  ) { }
 
-  @ApiOperation({ summary: 'Store a new email template' })
-  @ApiResponse({ status: 201, description: 'Template created successfully', type: CreateTemplateResponseDto })
-  @ApiResponse({ status: 400, description: 'Invalid HTML format', type: ErrorResponseDto })
-  @Post('store-template')
-  async storeTemplate(@Body() body: createTemplateDto, @Res() res: Response): Promise<any> {
-    const response = await this.emailService.createTemplate(body);
-    res.status(response.status_code).send(response);
+  @Post('send')
+  @ApiOperation({ summary: 'Send an email' })
+  @ApiResponse({ status: 200, description: 'The email has been successfully sent.' })
+  @ApiResponse({ status: 401, description: 'Unauthorized' })
+  @ApiConsumes('multipart/form-data')
+  @UseInterceptors(FilesInterceptor('attachments', 10))
+  sendEmail(
+    @UploadedFiles() files: Express.Multer.File[],
+    @Body() sendEmailDto: SendEmailDto,
+    @GetUser('userId') userId: string,
+    @GetUser('email') userEmail: string,
+  ) {
+    return this.emailService.sendEmail(userId, userEmail, sendEmailDto, files);
   }
 
-  @ApiOperation({ summary: 'Update an existing email template' })
-  @ApiResponse({ status: 200, description: 'Template updated successfully', type: UpdateTemplateResponseDto })
-  @ApiResponse({ status: 400, description: 'Invalid HTML format', type: ErrorResponseDto })
-  @ApiResponse({ status: 404, description: 'Template not found', type: ErrorResponseDto })
-  @ApiParam({ name: 'templateName', required: true, description: 'The name of the template to update' })
-  @Patch('update-template/:templateName')
-  async updateTemplate(
-    @Param('templateName') name: string,
-    @Body() body: UpdateTemplateDto,
-    @Res() res: Response,
-  ): Promise<any> {
-    const response = await this.emailService.updateTemplate(name, body);
-    res.status(response.status_code).send(response);
+  @Get()
+  @ApiOperation({ summary: 'Get all emails for the current user' })
+  @ApiResponse({ status: 200, description: 'The emails have been successfully retrieved.' })
+  @ApiResponse({ status: 401, description: 'Unauthorized' })
+  @ApiQuery({ name: 'page', required: false, type: Number })
+  @ApiQuery({ name: 'limit', required: false, type: Number })
+  @ApiQuery({ name: 'folder', required: false, enum: ['inbox', 'sent', 'drafts', 'trash'] })
+  getEmails(
+    @GetUser('userId') userId: string,
+    @GetUser('email') userEmail: string,
+    @Query('page') page = 1,
+    @Query('limit') limit = 10,
+    @Query('folder') folder = 'inbox',
+  ) {
+    return this.emailService.getEmails(userId, userEmail, { page, limit, folder });
   }
 
-  @ApiOperation({ summary: 'Retrieve an email template' })
-  @ApiResponse({ status: 200, description: 'Template retrieved successfully', type: GetTemplateResponseDto })
-  @ApiResponse({ status: 404, description: 'Template not found', type: ErrorResponseDto })
-  @Post('get-template')
-  async getTemplate(@Body() body: getTemplateDto, @Res() res: Response): Promise<any> {
-    const response = await this.emailService.getTemplate(body);
-    res.status(response.status_code).send(response);
+  @Get(':id')
+  @ApiOperation({ summary: 'Get a specific email by ID' })
+  @ApiResponse({ status: 200, description: 'The email has been successfully retrieved.' })
+  @ApiResponse({ status: 401, description: 'Unauthorized' })
+  @ApiResponse({ status: 404, description: 'Email not found' })
+  getEmail(
+    @Param('id') id: string,
+    @GetUser('userId') userId: string,
+    @GetUser('email') userEmail: string,
+  ) {
+    return this.emailService.getEmail(id, userId, userEmail);
   }
 
-  @ApiOperation({ summary: 'Retrieve all email templates' })
-  @ApiResponse({ status: 200, description: 'Templates retrieved successfully', type: GetAllTemplatesResponseDto })
-  @Get('get-all-templates')
-  async getAllTemplates(@Res() res: Response): Promise<any> {
-    const response = await this.emailService.getAllTemplates();
-    res.status(response.status_code).send(response);
+  @Post('reply/:id')
+  @ApiOperation({ summary: 'Reply to an email' })
+  @ApiResponse({ status: 200, description: 'The reply has been successfully sent.' })
+  @ApiResponse({ status: 401, description: 'Unauthorized' })
+  @ApiResponse({ status: 404, description: 'Email not found' })
+  @ApiConsumes('multipart/form-data')
+  @UseInterceptors(FilesInterceptor('attachments', 10))
+  replyToEmail(
+    @Param('id') id: string,
+    @Body() replyEmailDto: ReplyEmailDto,
+    @GetUser('userId') userId: string,
+    @GetUser('email') userEmail: string,
+  ) {
+    return this.emailService.replyToEmail(id, userId, userEmail, replyEmailDto);
+  }
+
+  @Delete(':id')
+  @ApiOperation({ summary: 'Delete an email' })
+  @ApiResponse({ status: 200, description: 'The email has been successfully deleted.' })
+  @ApiResponse({ status: 401, description: 'Unauthorized' })
+  @ApiResponse({ status: 404, description: 'Email not found' })
+  deleteEmail(
+    @Param('id') id: string,
+    @GetUser('userId') userId: string,
+    @GetUser('email') userEmail: string,
+  ) {
+    return this.emailService.deleteEmail(id, userId, userEmail);
+  }
+
+  @Delete(':id/permanent')
+  @ApiOperation({ summary: 'Permanently delete an email from trash' })
+  @ApiResponse({ status: 200, description: 'The email has been permanently deleted.' })
+  @ApiResponse({ status: 401, description: 'Unauthorized' })
+  @ApiResponse({ status: 404, description: 'Email not found' })
+  permanentlyDeleteEmail(
+    @Param('id') id: string,
+    @GetUser('userId') userId: string,
+    @GetUser('email') userEmail: string,
+  ) {
+    return this.emailService.permanentlyDeleteEmail(id, userId, userEmail);
+  }
+
+  @Delete('trash/empty')
+  @ApiOperation({ summary: 'Empty trash folder' })
+  @ApiResponse({ status: 200, description: 'All emails in trash have been permanently deleted.' })
+  @ApiResponse({ status: 401, description: 'Unauthorized' })
+  emptyTrash(
+    @GetUser('userId') userId: string,
+    @GetUser('email') userEmail: string,
+  ) {
+    return this.emailService.emptyTrash(userId, userEmail);
   }
 }
