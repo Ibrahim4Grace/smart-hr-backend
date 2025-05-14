@@ -15,17 +15,18 @@ export const INVALID_HEADER = 'Invalid or missing Authorization header';
 export const TOKEN_NOT_PROVIDED = 'Token not provided in Authorization header';
 export const ACCOUNT_INACTIVE = 'Account is inactive, please contact support';
 export const USER_ACTIVATEED = 'User already active';
-
-
+export const FORBIDDEN_DELETE_EMPLOYEE = 'You can only delete employees that you registered';
+export const ACCOUNT_DEACTIVATED = 'Account deactivated.Please contact your HR';
+export const USER_DELETE_FAILED = 'Failed to delete hr';
+export const ADMIN_NOT_FOUND = 'Admin not found!';
 export const USER_NOT_FOUND = 'User not found!';
 export const PROFILE_FOUND = 'Successfully fetched profile';
 export const PROFILE_UPDATED = 'Successfully updated profile';
 export const PROFILE_DELETED = 'Successfully deleted profile';
-export const USER_PROFILE_NOT_FOUND = 'User profile not found';
-export const PROFILE_NOT_FOUND = 'Profile not found';
 export const INVALID_PASSWORD = 'Invalid password';
 export const PASSWORD_CHANGE_FAILED = 'Failed to change password';
 export const EMPLOYEE_NOT_FOUND = 'Employee not found';
+export const HR_NOT_FOUND = 'HR not found';
 
 
 
@@ -55,9 +56,6 @@ export const INVALID_REFRESH_TOKEN = 'Invalid refresh token';
 export const ADMIN_ROLE_NOT_FOUND = 'Admin Role does not exist';
 // export const PAYMENT_NOTFOUND = 'Payment plan not found';
 
-export const ROLE_NOT_FOUND = 'Role not found in the organization';
-
-export const NO_USER_ORGS = 'User has no organisations';
 
 export const EMAIL_TEMPLATES = {
   TEMPLATE_UPDATED_SUCCESSFULLY: 'Template updated successfully',

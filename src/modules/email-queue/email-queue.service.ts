@@ -80,7 +80,7 @@ export class EmailQueueService {
     email: string,
     name: string,
     timestamp: string,
-    context: { reason: string; admin: string },
+    context: { admin: string },
   ) {
     this.logger.log(
       `Preparing deactivation email for ${email} with context: ${JSON.stringify({ name, ...context, timestamp })}`,
@@ -89,7 +89,6 @@ export class EmailQueueService {
       to: email,
       context: {
         name,
-        reason: context.reason,
         admin: context.admin,
         timestamp,
       },
@@ -105,13 +104,12 @@ export class EmailQueueService {
     email: string,
     name: string,
     timestamp: string,
-    context: { reason?: string; admin: string },
+    context: { admin: string },
   ) {
     const mailPayload: MailInterface = {
       to: email,
       context: {
         name,
-        reason: context.reason || 'Account reviewed',
         admin: context.admin,
         timestamp,
       },

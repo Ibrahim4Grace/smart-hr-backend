@@ -27,8 +27,6 @@ export class EmployeesService {
   constructor(
     @InjectRepository(Employee)
     private employeeRepository: Repository<Employee>,
-    private permissionsService: EntityPermissionsService,
-    private paginationService: PaginationService,
     private cloudinaryService: CloudinaryService,
     private cacheService: CacheService,
     private cachePrefixes: CachePrefixesService,
@@ -41,81 +39,6 @@ export class EmployeesService {
       where: { id: userId }
     });
     return employee;
-  }
-
-
-  async create(createEmployeeDto: CreateEmployeeDto, userId: string) {
-    const user = await this.permissionsService.getUserById(userId);
-    const plainPassword = createEmployeeDto.password;
-    const hashedPassword = await this.passwordService.hashPassword(createEmployeeDto.password);
-
-    const employee = this.employeeRepository.create({
-      ...createEmployeeDto,
-      password: hashedPassword,
-      added_by_hr: user,
-    });
-
-    try {
-      const savedEmployee = await this.employeeRepository.save(employee);
-
-      await this.emailQueueService.sendEmployeeOnboardingEmail(
-        savedEmployee.email,
-        savedEmployee.first_name,
-        savedEmployee.last_name,
-        plainPassword,
-        savedEmployee.company
-      );
-
-      await this.cacheService.deleteByPrefix(this.cachePrefixes.EMPLOYEE_LIST);
-
-      return savedEmployee;
-    } catch (error) {
-      this.logger.error(`Failed to create employee: ${error.message}`, error.stack);
-      throw new BadRequestException('Failed to create employee');
-    }
-  }
-
-  async findAll(paginationOptions: PaginationOptions<Employee>, userId: string) {
-    const user = await this.permissionsService.getUserById(userId);
-    const cacheKey = `${userId}:${JSON.stringify(paginationOptions)}`;
-
-    return this.cacheService.getOrSet(
-      this.cachePrefixes.EMPLOYEE_LIST,
-      cacheKey,
-      async () => {
-        return this.paginationService.paginate(
-          this.employeeRepository,
-          { added_by_hr: { id: user.id } },
-          {
-            ...paginationOptions,
-            relations: ['added_by_hr'],
-          }
-        );
-      },
-      this.cacheService.CACHE_TTL.MEDIUM
-    );
-  }
-
-  async findOne(id: string, userId: string) {
-    const user = await this.permissionsService.getUserById(userId);
-
-    return this.cacheService.getOrSet(
-      this.cachePrefixes.EMPLOYEE,
-      `${id}:${userId}`,
-      async () => {
-        const employee = await this.permissionsService.getEntityWithPermissionCheck(
-          Employee,
-          id,
-          user,
-          ['added_by_hr']
-        );
-
-        if (!employee) throw new CustomHttpException(SYS_MSG.EMPLOYEE_NOT_FOUND, HttpStatus.NOT_FOUND);
-
-        return employee;
-      },
-      this.cacheService.CACHE_TTL.MEDIUM
-    );
   }
 
   async update(employeeId: string, updateEmployeeDto: UpdateEmployeeDto, userId: string) {
@@ -135,32 +58,6 @@ export class EmployeesService {
     ]);
 
     return savedEmployee;
-  }
-
-  async remove(id: string, userId: string) {
-    const hrUser = await this.permissionsService.getUserById(userId);
-
-    const employeeToDelete = await this.employeeRepository.findOne({
-      where: { id },
-      relations: ['added_by_hr']
-    });
-
-    if (!employeeToDelete) {
-      throw new CustomHttpException(SYS_MSG.EMPLOYEE_NOT_FOUND, HttpStatus.NOT_FOUND);
-    }
-
-    if (employeeToDelete.added_by_hr.id !== hrUser.id) {
-      throw new CustomHttpException(SYS_MSG.FORBIDDEN_ACTION, HttpStatus.FORBIDDEN);
-    }
-
-    await this.employeeRepository.remove(employeeToDelete);
-
-    await Promise.all([
-      this.cacheService.delete(this.cachePrefixes.EMPLOYEE, id),
-      this.cacheService.deleteByPrefix(this.cachePrefixes.EMPLOYEE_LIST)
-    ]);
-
-    return { message: 'Employee deleted successfully' };
   }
 
   async uploadProfilePicture(
@@ -214,8 +111,6 @@ export class EmployeesService {
 
     if (!employee) throw new CustomHttpException(SYS_MSG.EMPLOYEE_NOT_FOUND, HttpStatus.NOT_FOUND);
 
-    if (employee.id !== employeeId) throw new CustomHttpException(SYS_MSG.FORBIDDEN_ACTION, HttpStatus.FORBIDDEN);
-
     const isPasswordValid = await this.passwordService.comparePassword(
       changePasswordDto.currentPassword,
       employee.password
@@ -226,7 +121,7 @@ export class EmployeesService {
     employee.password = hashedPassword;
 
     try {
-      await this.employeeRepository.update(employeeId, { password: hashedPassword });
+      await this.employeeRepository.save(employee);
 
       Promise.all([
         this.cacheService.delete(this.cachePrefixes.EMPLOYEE, employeeId),

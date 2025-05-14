@@ -54,6 +54,9 @@ export class User extends AbstractBaseEntity {
   @Column({ nullable: true })
   hr_profile_pic_url: string;
 
+  @Column({ nullable: true })
+  admin_profile_pic_url: string;
+
   @Column({ default: false })
   emailVerified: boolean;
 

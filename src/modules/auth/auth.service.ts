@@ -82,7 +82,7 @@ export class AuthService {
     const isValidOtp = await this.otpService.verify(user.id, verifyOtp.otp);
     if (!isValidOtp) throw new CustomHttpException(SYS_MSG.INVALID_OTP, HttpStatus.UNAUTHORIZED);
 
-    await this.userService.update(user.id, { emailVerified: true, is_active: true });
+    await this.userService.update(user.id, { emailVerified: true, is_active: true }, user.id);
     await this.otpService.remove(user.id);
 
     const responsePayload = {

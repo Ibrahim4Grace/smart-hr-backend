@@ -125,6 +125,14 @@ export class UpdateUserDto {
   @IsString()
   address?: string;
 
+  @ApiProperty({
+    description: 'The company',
+    example: 'Company Name',
+  })
+  @IsOptional()
+  @IsString()
+  company?: string;
+
   @IsOptional()
   @IsString()
   role?: string;
@@ -151,46 +159,4 @@ export interface UpdateUserResponseDTO {
 export class UpdateUserStatusDto {
   @IsString()
   status: string;
-}
-
-export class DeactivateAccountDto {
-  @ApiProperty({
-    example: true,
-    description: 'Email to deactivate the account',
-    nullable: false,
-  })
-  @IsString()
-  @IsNotEmpty()
-  email: string;
-
-  @ApiProperty({
-    example: 'No longer needed',
-    description: 'Optional reason for deactivating the account',
-    nullable: true,
-    required: false,
-  })
-  @IsString()
-  @IsNotEmpty()
-  reason: string;
-}
-
-export class ReactivateAccountDto {
-  @ApiProperty({
-    example: true,
-    description: 'Email to reactivate the account',
-    nullable: false,
-  })
-  @IsString()
-  @IsNotEmpty()
-  email: string;
-
-  @ApiProperty({
-    example: 'Now needed',
-    description: 'Optional reason for reactivating the account',
-    nullable: true,
-    required: false,
-  })
-  @IsString()
-  @IsNotEmpty()
-  reason: string;
 }

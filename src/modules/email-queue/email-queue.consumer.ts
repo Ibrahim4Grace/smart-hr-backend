@@ -124,6 +124,7 @@ export default class EmailQueueConsumer {
     }
   }
 
+
   @Process('employee-onboarding')
   async sendEmployeeOnboardingEmail(job: Job<MailInterface>) {
     try {

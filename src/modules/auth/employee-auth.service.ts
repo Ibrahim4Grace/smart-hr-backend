@@ -28,14 +28,15 @@ export class EmployeeAuthService {
     async login(email: string, password: string) {
         const employee = await this.employeeRepository.findOne({
             where: { email },
-            select: ['id', 'email', 'password', 'first_name', 'last_name', 'role']
+            select: ['id', 'email', 'password', 'first_name', 'last_name', 'role', 'status']
         });
 
         if (!employee) throw new CustomHttpException(SYS_MSG.INVALID_CREDENTIALS, HttpStatus.UNAUTHORIZED);
 
+        if (!employee.status) throw new CustomHttpException(SYS_MSG.ACCOUNT_DEACTIVATED, HttpStatus.FORBIDDEN);
+
         const isMatch = await this.passwordService.comparePassword(password, employee.password);
         if (!isMatch) throw new CustomHttpException(SYS_MSG.INVALID_CREDENTIALS, HttpStatus.UNAUTHORIZED);
-
 
         const tokenPayload = {
             userId: employee.id,

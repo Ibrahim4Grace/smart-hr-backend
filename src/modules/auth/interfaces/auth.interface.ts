@@ -13,6 +13,7 @@ export interface CreateUserResponse {
 
 export const UserRole = {
   SUPER_ADMIN: 'super_admin',
+  ADMIN: 'admin',
   EMPLOYEE: 'employee',
   HR: 'hr'
 } as const;

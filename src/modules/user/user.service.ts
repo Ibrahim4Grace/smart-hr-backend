@@ -21,8 +21,6 @@ import {
   UpdateUserResponseDTO,
   UpdateUserDto,
   DeleteUserResponse,
-  DeactivateAccountDto,
-  ReactivateAccountDto,
 } from './dto/create-user.dto';
 import {
   UserPayload,
@@ -34,6 +32,13 @@ import { CloudinaryService } from '@shared/services/cloudinary.service';
 import { PaginationService } from '@shared/services/pagination.service';
 import { FindOptionsOrder } from 'typeorm';
 import { EntityPermissionsService } from '@shared/services/permissions.service';
+import { PaginationOptions } from '@shared/interfaces/pagination.interface';
+import { CacheService } from '@shared/cache/cache.service';
+import { CachePrefixesService } from '@shared/cache/cache.prefixes.service';
+import { Employee } from '@modules/employee/entities/employee.entity';
+import { CreateEmployeeDto } from '@modules/employee/dto/create-employee.dto';
+import { ChangePasswordDto } from '@modules/employee/dto/change-password.dto';
+
 
 @Injectable()
 export class UserService {
@@ -42,11 +47,16 @@ export class UserService {
   constructor(
     @InjectRepository(User)
     private userRepository: Repository<User>,
+    @InjectRepository(Employee)
+    private employeeRepository: Repository<Employee>,
     private passwordService: PasswordService,
-    private readonly emailService: EmailQueueService,
     private readonly cloudinaryService: CloudinaryService,
     private readonly paginationService: PaginationService,
+    private cacheService: CacheService,
+    private cachePrefixes: CachePrefixesService,
     private readonly permissionsService: EntityPermissionsService,
+    private emailQueueService: EmailQueueService,
+
   ) {
     this.uploadsDir = PROFILE_PHOTO_UPLOADS;
   }
@@ -87,22 +97,6 @@ export class UserService {
     };
   }
 
-  async getUserDataWithoutPassword(userId: string, requestingUserId: string) {
-    const user = await this.getUserRecord({ identifier: userId, identifierType: 'id' });
-    if (!user) throw new CustomHttpException(SYS_MSG.USER_NOT_FOUND, HttpStatus.NOT_FOUND);
-
-    if (user.id !== requestingUserId) {
-      throw new CustomHttpException(SYS_MSG.ACCESS_DENIED_USER_PROFILE, HttpStatus.FORBIDDEN);
-    }
-
-    const { password, ...userData } = user;
-
-    return {
-      status_code: 200,
-      user: userData,
-    };
-  }
-
   async updateUserRecord(userUpdateOptions: UpdateUserRecordOption) {
     const { updatePayload, identifierOptions } = userUpdateOptions;
     const user = await this.getUserRecord(identifierOptions);
@@ -117,70 +111,151 @@ export class UserService {
     return repo.save(newUser);
   }
 
-  async findAll(page: number = 1, limit: number = 10, userId: string) {
-    const result = await this.paginationService.paginate<User>(
-      this.userRepository,
-      {},
-      {
-        page,
-        limit,
-        select: ['id', 'name', 'email', 'phone', 'is_active', 'created_at'],
-        order: { created_at: 'DESC' } as FindOptionsOrder<User>,
-      }
-    );
+  async createEmployee(createEmployeeDto: CreateEmployeeDto, userId: string) {
+    const user = await this.permissionsService.getUserById(userId);
+    const { email, phone_number, ...rest } = createEmployeeDto;
 
-    return {
-      status: 'success',
-      message: 'Users retrieved successfully',
-      data: {
-        users: result.data,
-        pagination: {
-          current_page: result.meta.page,
-          total_pages: result.meta.totalPages,
-          total_users: result.meta.total,
-        },
-      },
-    };
+    const existingEmployee = await this.employeeRepository.findOne({
+      where: [{ email }, { phone_number }],
+    });
+
+    if (existingEmployee) {
+      throw new BadRequestException('Employee with this email or phone number already exists.');
+    }
+    const plainPassword = createEmployeeDto.password;
+    const hashedPassword = await this.passwordService.hashPassword(createEmployeeDto.password);
+
+    const employee = this.employeeRepository.create({
+      ...createEmployeeDto,
+      password: hashedPassword,
+      added_by_hr: user,
+    });
+
+    try {
+      const savedEmployee = await this.employeeRepository.save(employee);
+
+      await this.emailQueueService.sendEmployeeOnboardingEmail(
+        savedEmployee.email,
+        savedEmployee.first_name,
+        savedEmployee.last_name,
+        plainPassword,
+        savedEmployee.company
+      );
+
+      await this.cacheService.deleteByPrefix(this.cachePrefixes.EMPLOYEE_LIST);
+
+      return savedEmployee;
+    } catch (error) {
+      this.logger.error(`Failed to create employee: ${error.message}`, error.stack);
+      throw new BadRequestException('Failed to create employee');
+    }
   }
 
-  async findOne(userId: string) {
-    const user = await this.getUserRecord({ identifier: userId, identifierType: 'id' });
-    if (!user) throw new CustomHttpException(SYS_MSG.USER_NOT_FOUND, HttpStatus.NOT_FOUND);
+  async findEmployeesByHR(hrId: string, paginationOptions: PaginationOptions<Employee>) {
+    return this.cacheService.getOrSet(
+      this.cachePrefixes.EMPLOYEE_LIST,
+      `hr:${hrId}:${JSON.stringify(paginationOptions)}`,
+      async () => {
+        const hr = await this.userRepository.findOne({
+          where: { id: hrId, role: UserRole.HR }
+        });
 
-    const { password, ...userData } = user;
+        if (!hr) throw new CustomHttpException(SYS_MSG.USER_NOT_FOUND, HttpStatus.NOT_FOUND);
 
-    return {
-      status_code: 200,
-      user: userData,
-    };
+        return this.paginationService.paginate(
+          this.employeeRepository,
+          { added_by_hr: { id: hrId } },
+          {
+            ...paginationOptions,
+            relations: ['added_by_hr']
+          }
+        );
+      },
+      this.cacheService.CACHE_TTL.MEDIUM
+    );
+  }
+
+  async findEmployeeById(employeeId: string, hrId: string) {
+    return this.cacheService.getOrSet(
+      this.cachePrefixes.EMPLOYEE_BY_ID,
+      `hr:${hrId}:employee:${employeeId}`,
+      async () => {
+        const hr = await this.userRepository.findOne({
+          where: { id: hrId, role: UserRole.HR }
+        });
+
+        if (!hr) throw new CustomHttpException(SYS_MSG.USER_NOT_FOUND, HttpStatus.NOT_FOUND);
+
+        const employee = await this.employeeRepository.findOne({
+          where: {
+            id: employeeId,
+            added_by_hr: { id: hrId }
+          },
+          relations: ['added_by_hr']
+        });
+
+        if (!employee) throw new CustomHttpException(SYS_MSG.EMPLOYEE_NOT_FOUND, HttpStatus.NOT_FOUND);
+
+        return {
+          status_code: 200,
+          employee
+        };
+      },
+      this.cacheService.CACHE_TTL.MEDIUM
+    );
+  }
+
+  async getHRInfo(hrId: string) {
+    return this.cacheService.getOrSet(
+      this.cachePrefixes.USER_BY_ID,
+      `hr:${hrId}`,
+      async () => {
+        const hr = await this.userRepository.findOne({
+          where: { id: hrId, role: UserRole.HR }
+        });
+
+        if (!hr) throw new CustomHttpException(SYS_MSG.USER_NOT_FOUND, HttpStatus.NOT_FOUND);
+        return {
+          status_code: 200,
+          hr
+        };
+      },
+      this.cacheService.CACHE_TTL.MEDIUM
+    );
   }
 
   async update(
     userId: string,
     updateUserDto: UpdateUserDto,
-    currentUser?: UserPayload,
+    currentUserId: string
   ): Promise<UpdateUserResponseDTO> {
     if (!userId) throw new CustomHttpException(SYS_MSG.USER_NOT_FOUND, HttpStatus.NOT_FOUND);
 
-    const identifierOptions: UserIdentifierOptionsType = {
-      identifierType: 'id',
-      identifier: userId,
-    };
-    const user = await this.getUserRecord(identifierOptions);
-    if (!user) throw new CustomHttpException(SYS_MSG.USER_NOT_FOUND, HttpStatus.NOT_FOUND);
+    const user = await this.permissionsService.getUserById(userId);
 
-    if (currentUser && currentUser.userId !== userId) {
-
-      throw new ForbiddenException({
-        error: 'Forbidden',
-        message: 'You are not authorized to update this user',
-        status_code: HttpStatus.FORBIDDEN,
-      });
+    if (user.id !== currentUserId) {
+      throw new CustomHttpException(SYS_MSG.FORBIDDEN_ACTION, HttpStatus.FORBIDDEN);
     }
 
     try {
+      // Use Object.assign to update the existing entity
       Object.assign(user, updateUserDto);
-      await this.userRepository.save(user);
+      const savedUser = await this.userRepository.save(user);
+
+      await Promise.all([
+        this.cacheService.delete(this.cachePrefixes.USER_BY_ID, userId),
+        this.cacheService.deleteByPrefix(this.cachePrefixes.USER)
+      ]);
+
+      return {
+        status: 'success',
+        message: 'User Updated Successfully',
+        user: {
+          id: savedUser.id,
+          name: savedUser.name,
+          phone: savedUser.phone,
+        }
+      };
     } catch (error) {
       throw new BadRequestException({
         error: 'Bad Request',
@@ -188,111 +263,6 @@ export class UserService {
         status_code: HttpStatus.BAD_REQUEST,
       });
     }
-
-    return {
-      status: 'success',
-      message: 'User Updated Successfully',
-      user: {
-        id: user.id,
-        name: `${user.name}`,
-        phone: user.phone,
-      },
-    };
-  }
-
-  async remove(userId: string): Promise<DeleteUserResponse> {
-    const user = await this.userRepository.findOne({
-      where: { id: userId },
-      relations: ['subscriptions'],
-    });
-    if (!user) throw new CustomHttpException(SYS_MSG.USER_NOT_FOUND, HttpStatus.NOT_FOUND);
-
-    await this.userRepository.remove(user);
-
-    return {
-      status: 'success',
-      message: 'User deleted successfully',
-    };
-  }
-
-  // A private helper method for common user and admin fetch logic
-  private async getUserAndAdmin(userEmail: string, adminId: string): Promise<[any, any]> {
-    const [user, admin] = await Promise.all([
-      this.userRepository.findOne({
-        where: { email: userEmail },
-      }),
-      this.userRepository.findOne({
-        where: { id: adminId },
-        select: ['id', 'name'],
-      })
-    ]);
-
-    if (!user) throw new CustomHttpException(SYS_MSG.USER_NOT_FOUND, HttpStatus.UNAUTHORIZED);
-    if (!admin) throw new CustomHttpException('Admin not found', HttpStatus.UNAUTHORIZED);
-
-    return [user, admin];
-  }
-
-  async deactivateUser(adminId: string, deactivateDto: DeactivateAccountDto): Promise<DeleteUserResponse> {
-    const [user, admin] = await this.getUserAndAdmin(deactivateDto.email, adminId);
-
-    if (!user.is_active) throw new CustomHttpException(SYS_MSG.USER_DEACTIVATED, HttpStatus.BAD_REQUEST);
-    const adminName = admin.name;
-
-    user.status = false;
-    user.deactivation_reason = deactivateDto.reason;
-    user.deactivated_by = adminName;
-    user.deactivated_at = new Date();
-
-    // Clear any reactivation data when deactivating
-    user.reactivation_reason = null;
-    user.reactivated_by = null;
-    user.reactivated_at = null;
-
-    await this.userRepository.save(user);
-
-    try {
-      await this.emailService.sendDeactivationNotification(user.email, user.name, timestamp, {
-        reason: deactivateDto.reason,
-        admin: adminName,
-      });
-      this.logger.log(`Successfully sent deactivation email to ${user.email} for user ${user.name}`);
-    } catch (emailError) {
-      this.logger.error('Error sending confirmation email:', emailError);
-    }
-
-    return {
-      status: 'success',
-      message: 'User deactivated successfully',
-    };
-  }
-
-  async reactivateUser(adminId: string, reactivateDto: ReactivateAccountDto): Promise<DeleteUserResponse> {
-    const [user, admin] = await this.getUserAndAdmin(reactivateDto.email, adminId);
-
-    if (user.is_active) throw new CustomHttpException('User account is already active', HttpStatus.BAD_REQUEST);
-
-    const adminName = admin.name;
-
-    user.status = true;
-    user.reactivation_reason = reactivateDto.reason;
-    user.reactivated_by = adminName;
-    user.reactivated_at = new Date();
-    await this.userRepository.save(user);
-
-    try {
-      await this.emailService.sendReactivationNotification(user.email, user.name, timestamp, {
-        reason: reactivateDto.reason,
-        admin: adminName,
-      });
-    } catch (emailError) {
-      this.logger.error('Error sending confirmation email:', emailError);
-    }
-
-    return {
-      status: 'success',
-      message: 'User reactivated successfully',
-    };
   }
 
   async uploadProfilePicture(
@@ -301,9 +271,8 @@ export class UserService {
   ): Promise<{ status: string; message: string; data: { avatar_url: string } }> {
     if (!uploadProfilePicDto.avatar) throw new CustomHttpException(SYS_MSG.NO_FILE_FOUND, HttpStatus.BAD_REQUEST);
 
-    // Get the user and verify they exist
     const user = await this.permissionsService.getUserById(userId);
-
+    if (user.id !== userId) throw new CustomHttpException(SYS_MSG.FORBIDDEN_ACTION, HttpStatus.FORBIDDEN);
 
     try {
       // If user already has a profile picture, delete it from Cloudinary
@@ -315,9 +284,13 @@ export class UserService {
       // Upload new image to Cloudinary
       const avatarUrl = await this.cloudinaryService.uploadFile(uploadProfilePicDto.avatar, 'profile-pictures');
 
-      // Update user's profile picture URL
       user.hr_profile_pic_url = avatarUrl;
       await this.userRepository.save(user);
+
+      await Promise.all([
+        this.cacheService.delete(this.cachePrefixes.USER_BY_ID, userId),
+        this.cacheService.deleteByPrefix(this.cachePrefixes.USER)
+      ]);
 
       return {
         status: 'success',
@@ -332,6 +305,150 @@ export class UserService {
       );
     }
   }
+
+  async remove(employeeId: string, userId: string): Promise<DeleteUserResponse> {
+
+    const user = await this.permissionsService.getUserById(userId);
+    await this.permissionsService.getEntityWithPermissionCheck(Employee, employeeId, user);
+
+    // Find the employee with relation to the HR who added them
+    const employee = await this.employeeRepository.findOne({
+      where: {
+        id: employeeId,
+        added_by_hr: { id: userId }
+      },
+      relations: ['added_by_hr']
+    });
+
+    if (!employee) throw new CustomHttpException(SYS_MSG.FORBIDDEN_DELETE_EMPLOYEE, HttpStatus.FORBIDDEN);
+    await this.employeeRepository.remove(employee);
+
+    return {
+      status: 'success',
+      message: 'Employee deleted successfully',
+    };
+  }
+
+  async changePassword(userId: string, changePasswordDto: ChangePasswordDto) {
+    const user = await this.userRepository.findOne({
+      where: { id: userId },
+      select: ['id', 'password', 'email', 'name']
+    });
+
+    if (!user) throw new CustomHttpException(SYS_MSG.USER_NOT_FOUND, HttpStatus.NOT_FOUND);
+
+
+    const isPasswordValid = await this.passwordService.comparePassword(
+      changePasswordDto.currentPassword,
+      user.password
+    );
+
+    if (!isPasswordValid) throw new CustomHttpException(SYS_MSG.INVALID_CURRENT_PWD, HttpStatus.BAD_REQUEST);
+
+    const hashedPassword = await this.passwordService.hashPassword(changePasswordDto.newPassword);
+    user.password = hashedPassword;
+
+    try {
+      await this.userRepository.save(user);
+
+      Promise.all([
+        this.cacheService.delete(this.cachePrefixes.USER_BY_ID, userId),
+        this.emailQueueService.sendPasswordChangedMail(user.email, user.name, timestamp)
+      ]).catch(error => {
+        this.logger.error(`Background tasks after password change failed: ${error.message}`, error.stack);
+      });
+
+      return {
+        message: SYS_MSG.PASSWORD_UPDATED,
+        status: 'success'
+      };
+    } catch (error) {
+      this.logger.error(`Failed to change password: ${error.message}`, error.stack);
+      throw new CustomHttpException(SYS_MSG.PASSWORD_CHANGE_FAILED, HttpStatus.INTERNAL_SERVER_ERROR);
+    }
+  }
+
+  async deactivateEmployee(
+    hrId: string,
+    employeeId: string
+  ): Promise<DeleteUserResponse> {
+
+    const hr = await this.permissionsService.getUserById(hrId);
+    const employee = await this.employeeRepository.findOne({
+      where: { id: employeeId },
+      relations: ['added_by_hr']
+    });
+
+    if (!employee) throw new CustomHttpException(SYS_MSG.EMPLOYEE_NOT_FOUND, HttpStatus.NOT_FOUND);
+
+    // Verify the HR has permission to modify this employee
+    if (!this.permissionsService.canAccessEntity(employee, hr)) {
+      throw new CustomHttpException(SYS_MSG.FORBIDDEN_ACTION, HttpStatus.FORBIDDEN);
+    }
+
+    // Deactivate the employee
+    employee.status = false;
+    employee.deactivated_by = hr.name;
+    employee.deactivated_at = new Date();
+
+    // Clear any reactivation data
+    employee.reactivation_reason = null;
+    employee.reactivated_by = null;
+    employee.reactivated_at = null;
+
+    await this.employeeRepository.save(employee);
+    await this.emailQueueService.sendDeactivationNotification(
+      employee.email,
+      employee.name,
+      timestamp,
+      {
+        admin: hr.name
+      }
+    )
+
+    return {
+      status: 'success',
+      message: 'Employee deactivated successfully',
+    };
+  }
+
+  async reactivateEmployee(
+    hrId: string,
+    employeeId: string,
+    reason?: string
+  ): Promise<DeleteUserResponse> {
+    const hr = await this.permissionsService.getUserById(hrId);
+
+    const employee = await this.employeeRepository.findOne({
+      where: { id: employeeId },
+      relations: ['added_by_hr']
+    });
+
+    if (!employee) throw new CustomHttpException(SYS_MSG.EMPLOYEE_NOT_FOUND, HttpStatus.NOT_FOUND);
+    if (!this.permissionsService.canAccessEntity(employee, hr)) {
+      throw new CustomHttpException(SYS_MSG.FORBIDDEN_ACTION, HttpStatus.FORBIDDEN);
+    }
+
+    employee.status = true;
+    employee.reactivated_by = hr.name;
+    employee.reactivated_at = new Date();
+
+    await this.employeeRepository.save(employee);
+    await this.emailQueueService.sendReactivationNotification(
+      employee.email,
+      employee.name,
+      timestamp,
+      {
+        admin: hr.name
+      }
+    )
+
+    return {
+      status: 'success',
+      message: 'Employee reactivated successfully',
+    };
+  }
+
 
 
 }

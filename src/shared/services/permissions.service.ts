@@ -68,16 +68,22 @@ export class EntityPermissionsService {
         relations: string[] = ['user'],
     ): Promise<T> {
         const repository = this.dataSource.getRepository(entityClass);
+        const entityName = this.getEntityName(entityClass);
+
+        // For Employee entity, i need to check added_by_hr relation
+        // For other entities, i use the provided relations (defaulting to ['user'])
+        const entityRelations = entityName === 'Employee'
+            ? ['added_by_hr']
+            : relations;
 
         const entity = await repository.findOne({
             where: { id: entityId } as any,
-            relations: relations,
+            relations: entityRelations,
         });
 
-        if (!entity) throw new NotFoundException(`${this.getEntityName(entityClass)} not found`);
+        if (!entity) throw new NotFoundException(`${entityName} not found`);
 
         if (!this.canAccessEntity(entity, user)) {
-            const entityName = entityClass.toString().split(' ')[1];
             throw new ForbiddenException(`You do not have permission to access this ${entityName.toLowerCase()}`);
         }
 

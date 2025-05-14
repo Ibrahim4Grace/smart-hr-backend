@@ -9,6 +9,8 @@ import { EmployeesService } from '@modules/employee/employees.service';
 import { SharedModule } from '@shared/shared.module';
 import { AuthModule } from '@modules/auth/auth.module';
 import { EmailQueueModule } from '@modules/email-queue/email-queue.module';
+import { CloudinaryService } from '@shared/services/cloudinary.service';
+
 
 @Module({
     imports: [
@@ -18,7 +20,7 @@ import { EmailQueueModule } from '@modules/email-queue/email-queue.module';
         EmailQueueModule,
     ],
     controllers: [AdminController],
-    providers: [AdminService, UserService, EmployeesService],
+    providers: [AdminService, UserService, EmployeesService, CloudinaryService],
     exports: [AdminService],
 })
 export class AdminModule { } 
