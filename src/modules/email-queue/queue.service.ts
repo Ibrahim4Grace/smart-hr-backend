@@ -30,5 +30,6 @@ export interface MailSender {
   | 'reset-successful'
   | 'deactivate-notification'
   | 'reactivate-notification'
-  | 'employee-onboarding';
+  | 'employee-onboarding'
+  | 'account-deletion';
 }

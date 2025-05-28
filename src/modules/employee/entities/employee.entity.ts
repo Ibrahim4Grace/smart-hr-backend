@@ -54,16 +54,10 @@ export class Employee extends AbstractBaseEntity {
   status: boolean;
 
   @Column({ nullable: true })
-  deactivation_reason: string;
-
-  @Column({ nullable: true })
   deactivated_by: string;
 
   @Column({ type: 'timestamp', nullable: true })
   deactivated_at: Date;
-
-  @Column({ nullable: true })
-  reactivation_reason: string;
 
   @Column({ nullable: true })
   reactivated_by: string;

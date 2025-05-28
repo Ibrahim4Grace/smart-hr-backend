@@ -32,7 +32,7 @@ export interface UserInterface {
   phone?: string;
 }
 
-export type CreateNewUserOptions = Pick<UserInterface, 'email' | 'name' | 'password'> & {
+export type CreateNewUserOptions = Pick<UserInterface, 'email' | 'name' | 'password' | 'role'> & {
   admin_secret?: string;
 };
 

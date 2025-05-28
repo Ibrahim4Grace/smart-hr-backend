@@ -84,6 +84,7 @@ export class AdminController {
     }
 
     @Delete(':targetHrId')
+    @Roles(UserRole.SUPER_ADMIN)
     @ApiOperation({ summary: 'Delete a hr account' })
     @ApiResponse({ status: 204, description: 'Deletion in progress' })
     @ApiResponse({ status: 400, description: 'Bad Request' })
@@ -92,7 +93,7 @@ export class AdminController {
     remove(
         @Param('targetHrId') targetHrId: string,
         @GetUser('userId') adminId: string,) {
-        return this.adminService.remove(targetHrId, adminId);
+        return this.adminService.remove(adminId, targetHrId);
     }
 
     @Patch(':userId')
@@ -110,7 +111,7 @@ export class AdminController {
         return this.adminService.update(userId, updatedUserDto, currentUserId);
     }
 
-    @Patch(':hrId/deactivate')
+    @Post(':hrId/deactivate')
     @ApiOperation({ summary: 'Deactivate an hr and its employees' })
     @ApiResponse({ status: 200, description: 'The hr and its employees have been successfully deactivated.' })
     @ApiResponse({ status: 400, description: 'Bad Request or Employee already deactivated' })
@@ -123,7 +124,7 @@ export class AdminController {
         return this.adminService.deactivateHrAccount(hrId, adminId);
     }
 
-    @Patch(':hrId/reactivate')
+    @Post(':hrId/reactivate')
     @ApiOperation({ summary: 'Reactivate an hr and its employees' })
     @ApiResponse({ status: 200, description: 'The hr and its employees have been successfully reactivated.' })
     @ApiResponse({ status: 400, description: 'Bad Request or Employee already active' })
@@ -135,6 +136,7 @@ export class AdminController {
         @Param('hrId') hrId: string,) {
         return this.adminService.reactivateHrAccount(hrId, adminId);
     }
+
 
 
 
@@ -165,42 +167,4 @@ export class AdminController {
     }
 
 
-    // @Post('hr/:hrId/deactivate')
-    // @ApiOperation({ summary: 'Deactivate an HR account and their employees' })
-    // @ApiResponse({ status: 200, description: 'HR account and employees deactivated successfully' })
-    // @ApiResponse({ status: 403, description: 'Forbidden' })
-    // @ApiResponse({ status: 404, description: 'HR account not found' })
-    // async deactivateHrAccount(
-    //     @Param('hrId') hrId: string,
-    //     @Body('reason') reason: string,
-    //     @GetUser('userId') adminId: string,
-    // ) {
-    //     await this.adminService.deactivateHrAccount(hrId, reason, adminId);
-    //     return { message: 'HR account and associated employees deactivated successfully' };
-    // }
-
-    // @Post('hr/:hrId/reactivate')
-    // @ApiOperation({ summary: 'Reactivate an HR account and their employees' })
-    // @ApiResponse({ status: 200, description: 'HR account and employees reactivated successfully' })
-    // @ApiResponse({ status: 403, description: 'Forbidden' })
-    // @ApiResponse({ status: 404, description: 'HR account not found' })
-    // async reactivateHrAccount(
-    //     @Param('hrId') hrId: string,
-    //     @Body('reason') reason: string,
-    //     @GetUser('userId') adminId: string,
-    // ) {
-    //     await this.adminService.reactivateHrAccount(hrId, reason, adminId);
-    //     return { message: 'HR account and associated employees reactivated successfully' };
-    // }
-
-
-    // @Get('hr/:hrId')
-    // @ApiOperation({ summary: 'Get HR account details' })
-    // @ApiResponse({ status: 200, description: 'HR account details retrieved successfully' })
-    // @ApiResponse({ status: 403, description: 'Forbidden' })
-    // @ApiResponse({ status: 404, description: 'HR account not found' })
-    // async getHrAccountDetails(@Param('hrId') hrId: string) {
-    //     const hrAccount = await this.adminService.getHrAccountDetails(hrId);
-    //     return { data: hrAccount };
-    // }
 } 

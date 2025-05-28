@@ -218,42 +218,64 @@ export class AdminService {
     }
 
     async remove(adminId: string, targetHrId: string): Promise<DeleteUserResponse> {
-        const admin = await this.userRepository.findOne({
-            where: {
-                id: adminId,
-                role: In([UserRole.ADMIN, UserRole.SUPER_ADMIN])
-            }
-        });
+        const [admin, targetHr] = await Promise.all([
+            this.userRepository.findOne({
+                where: { id: adminId, role: UserRole.SUPER_ADMIN },
+                cache: false
+            }),
+            this.userRepository.findOne({
+                where: { id: targetHrId, role: UserRole.HR },
+                relations: ['employees'],
+                cache: false
+            })
+        ]);
 
         if (!admin) throw new CustomHttpException(SYS_MSG.ADMIN_NOT_FOUND, HttpStatus.UNAUTHORIZED);
-
-        // Find the target user (HR)
-        const targetHr = await this.userRepository.findOne({
-            where: { id: targetHrId },
-            relations: ['employees']
-        });
-
         if (!targetHr) throw new CustomHttpException(SYS_MSG.HR_NOT_FOUND, HttpStatus.NOT_FOUND);
 
+
         try {
+            // Send notification emails before deletion
+            await Promise.all([
+                // Send notification to HR
+                this.emailQueueService.sendAccountDeletionNotification(
+                    targetHr.email,
+                    targetHr.name,
+                    timestamp,
+                    {
+                        admin: admin.name
+                    }
+
+                ),
+                // Send notifications to all employees
+                ...targetHr.employees.map(employee =>
+                    this.emailQueueService.sendAccountDeletionNotification(
+                        employee.email,
+                        employee.name,
+                        timestamp,
+                        {
+                            admin: admin.name
+                        }
+                    )
+                )
+            ]);
+
             // Begin transaction to ensure atomicity
             await this.dataSource.transaction(async (transactionalEntityManager) => {
-                // First, find and delete all employees added by this HR
-                const employees = await this.employeeRepository.find({
-                    where: { added_by_hr: { id: targetHrId } }
-                });
-
-                if (employees.length > 0) {
-                    await transactionalEntityManager.remove(employees);
-                    this.logger.log(`Deleted ${employees.length} employees associated with hr ${targetHrId}`);
-                }
-
-                // Then delete the user
-                await transactionalEntityManager.remove(targetHr);
+                // Delete employees and HR in parallel
+                await Promise.all([
+                    // Delete all employees
+                    transactionalEntityManager.remove(targetHr.employees),
+                    // Delete the HR
+                    transactionalEntityManager.remove(targetHr)
+                ]);
             });
 
-            // Clear any cached data related to this user
-            await this.cacheService.delete(this.cachePrefixes.USER_BY_ID, targetHrId);
+            // Clear cache in parallel
+            await Promise.all([
+                this.cacheService.delete(this.cachePrefixes.USER_BY_ID, targetHrId),
+                this.cacheService.delete(this.cachePrefixes.USER_BY_EMAIL, targetHr.email),
+            ]);
 
             return {
                 status: 'success',
@@ -264,6 +286,7 @@ export class AdminService {
             throw new CustomHttpException(SYS_MSG.USER_DELETE_FAILED, HttpStatus.INTERNAL_SERVER_ERROR);
         }
     }
+
     async changePassword(userId: string, changePasswordDto: ChangePasswordDto) {
         const admin = await this.userRepository.findOne({
             where: { id: userId, role: UserRole.SUPER_ADMIN },
@@ -303,8 +326,8 @@ export class AdminService {
         }
     }
 
-    async deactivateHrAccount(hrId: string, adminId: string): Promise<void> {
-        // Get both HR and admin users in parallel
+    async deactivateHrAccount(hrId: string, adminId: string): Promise<DeleteUserResponse> {
+
         const [hr, admin] = await Promise.all([
             this.userRepository.findOne({
                 where: { id: hrId, role: UserRole.HR },
@@ -317,14 +340,15 @@ export class AdminService {
         if (!hr) throw new CustomHttpException('HR account not found', HttpStatus.NOT_FOUND);
         if (!admin) throw new CustomHttpException('Admin not found', HttpStatus.NOT_FOUND);
 
-
         // Using transaction to ensure consistency
         await this.userRepository.manager.transaction(async transactionalEntityManager => {
-            // 1. Deactivate HR account
+            // Deactivate HR account and clear reactivation data
             await transactionalEntityManager.update(User, hrId, {
                 status: false,
                 deactivated_by: admin.name,
                 deactivated_at: new Date(),
+                reactivated_by: null,
+                reactivated_at: null
             });
 
             // Get all employees associated with this HR (for notification)
@@ -332,7 +356,7 @@ export class AdminService {
                 where: { added_by_hr: { id: hrId } },
             });
 
-            //Deactivate all employees added by this HR
+            //Deactivate all employees added by this HR and clear reactivation data
             await transactionalEntityManager.update(
                 Employee,
                 { added_by_hr: { id: hrId } },
@@ -340,6 +364,8 @@ export class AdminService {
                     status: false,
                     deactivated_by: admin.name,
                     deactivated_at: new Date(),
+                    reactivated_by: null,
+                    reactivated_at: null
                 },
             );
 
@@ -366,10 +392,23 @@ export class AdminService {
             }
         });
 
+        // Clear cache after successful transaction
+        await Promise.all([
+            this.cacheService.delete(this.cachePrefixes.USER_BY_ID, hrId),
+            this.cacheService.delete(this.cachePrefixes.USER_BY_EMAIL, hr.email),
+            this.cacheService.deleteByPrefix(this.cachePrefixes.USER),
+            this.cacheService.deleteByPrefix(this.cachePrefixes.EMPLOYEE)
+        ]);
+
         this.logger.log(`HR account ${hrId} and associated employees deactivated by admin ${adminId}`);
+
+        return {
+            status: 'success',
+            message: 'HR account and associated employees deactivated by admin}',
+        };
     }
 
-    async reactivateHrAccount(hrId: string, adminId: string): Promise<void> {
+    async reactivateHrAccount(hrId: string, adminId: string): Promise<DeleteUserResponse> {
         const [hr, admin] = await Promise.all([
             this.userRepository.findOne({
                 where: { id: hrId, role: UserRole.HR },
@@ -390,6 +429,8 @@ export class AdminService {
                 status: true,
                 reactivated_by: admin.name,
                 reactivated_at: new Date(),
+                deactivated_by: null,
+                deactivated_at: null,
             });
 
             // 2. Get all employees associated with this HR (for notification)
@@ -405,6 +446,9 @@ export class AdminService {
                     status: true,
                     reactivated_by: admin.name,
                     reactivated_at: new Date(),
+                    deactivated_by: null,
+                    deactivated_at: null,
+
                 },
             );
 
@@ -431,7 +475,22 @@ export class AdminService {
             }
         });
 
+        // Clear cache after successful transaction
+        await Promise.all([
+            this.cacheService.delete(this.cachePrefixes.USER_BY_ID, hrId),
+            this.cacheService.delete(this.cachePrefixes.USER_BY_EMAIL, hr.email),
+            this.cacheService.deleteByPrefix(this.cachePrefixes.USER),
+            this.cacheService.deleteByPrefix(this.cachePrefixes.EMPLOYEE)
+        ]);
+
         this.logger.log(`HR account ${hrId} and associated employees reactivated by admin ${adminId}`);
+
+        return {
+            status: 'success',
+            message: 'HR account and associated employees reactivated by admin',
+        };
     }
+
+
 
 } 

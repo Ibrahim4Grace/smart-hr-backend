@@ -7,6 +7,7 @@ import { Calendar } from '@modules/calendar/entities/calendar.entity';
 import { Exclude } from 'class-transformer';
 import { Note } from '@modules/notes/entities/note.entity';
 import { Invoice } from '@modules/invoice/entities/invoice.entity';
+import { Employee } from '@modules/employee/entities/employee.entity';
 
 @Entity({ name: 'users' })
 export class User extends AbstractBaseEntity {
@@ -31,16 +32,10 @@ export class User extends AbstractBaseEntity {
   company: string;
 
   @Column({ nullable: true })
-  deactivation_reason: string;
-
-  @Column({ nullable: true })
   deactivated_by: string;
 
   @Column({ type: 'timestamp', nullable: true })
   deactivated_at: Date;
-
-  @Column({ nullable: true })
-  reactivation_reason: string;
 
   @Column({ nullable: true })
   reactivated_by: string;
@@ -84,5 +79,8 @@ export class User extends AbstractBaseEntity {
     cascade: true,
   })
   subscriptions: Subscription[];
+
+  @OneToMany(() => Employee, (employee) => employee.added_by_hr)
+  employees: Employee[];
 
 }

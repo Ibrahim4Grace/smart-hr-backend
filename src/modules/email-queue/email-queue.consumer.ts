@@ -18,7 +18,7 @@ export default class EmailQueueConsumer {
       this.logger.log(`Processing register-otp job for ${mail.to} with context: ${JSON.stringify(mail.context)}`);
       await this.mailerService.sendMail({
         ...mail,
-        subject: 'Welcome to spot! Confirm your Email',
+        subject: 'Welcome to smarth-hr! Confirm your Email',
         template: 'register-otp',
       });
       this.logger.log(`Register OTP email sent successfully to ${mail.to}`);
@@ -35,7 +35,7 @@ export default class EmailQueueConsumer {
       } = job;
       await this.mailerService.sendMail({
         ...mail,
-        subject: 'Welcome to The Spot!',
+        subject: 'Welcome to The smarth-hr!',
         template: 'email-complete',
       });
       this.logger.log(`Welcome email sent successfully to ${mail.to}`);
@@ -82,6 +82,25 @@ export default class EmailQueueConsumer {
     }
   }
 
+  @Process('employee-onboarding')
+  async sendEmployeeOnboardingEmail(job: Job<MailInterface>) {
+    try {
+      const { mail } = job.data;
+      this.logger.log(`Processing employee onboarding email job for ${mail.to} with context: ${JSON.stringify(mail.context)}`);
+
+      await this.mailerService.sendMail({
+        ...mail,
+        subject: `Welcome to ${mail.context.company}!`,
+        template: 'employee-onboarding',
+      });
+
+      this.logger.log(`Employee onboarding email sent successfully to ${mail.to}`);
+    } catch (error) {
+      this.logger.error(`Employee onboarding email failed for ${job.data.mail.to}`, error.stack);
+      throw error;
+    }
+  }
+
   @Process('deactivate-notification')
   async sendDeactivationEmail(job: Job<MailInterface>) {
     try {
@@ -92,11 +111,9 @@ export default class EmailQueueConsumer {
         ...mail,
         subject: 'Your Account Has Been Deactivated',
         template: 'deactivate-notification',
-        // context: mail.context,
       });
       this.logger.log(`Deactivation notice sent successfully to ${mail.to}`);
     } catch (error) {
-      // this.logger.error(`Deactivation email failed for ${job.data.mail.to}`, error.stack);
       this.logger.error(`Deactivation email failed for ${job.data.mail.to}`, {
         error: error.message,
         stack: error.stack,
@@ -124,23 +141,25 @@ export default class EmailQueueConsumer {
     }
   }
 
-
-  @Process('employee-onboarding')
-  async sendEmployeeOnboardingEmail(job: Job<MailInterface>) {
+  @Process('account-deletion')
+  async sendAccountDeletionEmail(job: Job<MailInterface>) {
     try {
+      this.logger.log(`Received account-deletion job with data: ${JSON.stringify(job.data)}`);
+
       const { mail } = job.data;
-      this.logger.log(`Processing employee onboarding email job for ${mail.to} with context: ${JSON.stringify(mail.context)}`);
+      this.logger.log(`Processing deleting hr and its employees account email job for ${mail.to} with context: ${JSON.stringify(mail.context)}`);
 
       await this.mailerService.sendMail({
         ...mail,
-        subject: `Welcome to ${mail.context.company}!`,
-        template: 'employee-onboarding',
+        subject: 'Account Deletion Notification',
+        template: 'account-deletion',
       });
 
-      this.logger.log(`Employee onboarding email sent successfully to ${mail.to}`);
+      this.logger.log(`Hr and its employee account delete email sent successfully to ${mail.to}`);
     } catch (error) {
-      this.logger.error(`Employee onboarding email failed for ${job.data.mail.to}`, error.stack);
+      console.log(`Hr and its employee account delete email failed for ${job.data.mail.to}`, error.stack);
       throw error;
     }
   }
+
 }

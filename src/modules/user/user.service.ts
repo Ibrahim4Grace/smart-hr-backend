@@ -142,7 +142,7 @@ export class UserService {
         savedEmployee.company
       );
 
-      await this.cacheService.deleteByPrefix(this.cachePrefixes.EMPLOYEE_LIST);
+      await this.cacheService.deleteByPrefix(this.cachePrefixes.EMPLOYEE);
 
       return savedEmployee;
     } catch (error) {
@@ -323,6 +323,11 @@ export class UserService {
     if (!employee) throw new CustomHttpException(SYS_MSG.FORBIDDEN_DELETE_EMPLOYEE, HttpStatus.FORBIDDEN);
     await this.employeeRepository.remove(employee);
 
+    await Promise.all([
+      this.cacheService.delete(this.cachePrefixes.EMPLOYEE_BY_ID, employeeId),
+      this.cacheService.deleteByPrefix(this.cachePrefixes.EMPLOYEE)
+    ]);
+
     return {
       status: 'success',
       message: 'Employee deleted successfully',
@@ -372,7 +377,6 @@ export class UserService {
     hrId: string,
     employeeId: string
   ): Promise<DeleteUserResponse> {
-
     const hr = await this.permissionsService.getUserById(hrId);
     const employee = await this.employeeRepository.findOne({
       where: { id: employeeId },
@@ -380,8 +384,6 @@ export class UserService {
     });
 
     if (!employee) throw new CustomHttpException(SYS_MSG.EMPLOYEE_NOT_FOUND, HttpStatus.NOT_FOUND);
-
-    // Verify the HR has permission to modify this employee
     if (!this.permissionsService.canAccessEntity(employee, hr)) {
       throw new CustomHttpException(SYS_MSG.FORBIDDEN_ACTION, HttpStatus.FORBIDDEN);
     }
@@ -392,11 +394,14 @@ export class UserService {
     employee.deactivated_at = new Date();
 
     // Clear any reactivation data
-    employee.reactivation_reason = null;
     employee.reactivated_by = null;
     employee.reactivated_at = null;
 
     await this.employeeRepository.save(employee);
+    await Promise.all([
+      this.cacheService.delete(this.cachePrefixes.EMPLOYEE_BY_ID, employeeId),
+      this.cacheService.deleteByPrefix(this.cachePrefixes.EMPLOYEE)
+    ]);
     await this.emailQueueService.sendDeactivationNotification(
       employee.email,
       employee.name,
@@ -414,11 +419,9 @@ export class UserService {
 
   async reactivateEmployee(
     hrId: string,
-    employeeId: string,
-    reason?: string
+    employeeId: string
   ): Promise<DeleteUserResponse> {
     const hr = await this.permissionsService.getUserById(hrId);
-
     const employee = await this.employeeRepository.findOne({
       where: { id: employeeId },
       relations: ['added_by_hr']
@@ -434,6 +437,10 @@ export class UserService {
     employee.reactivated_at = new Date();
 
     await this.employeeRepository.save(employee);
+    await Promise.all([
+      this.cacheService.delete(this.cachePrefixes.EMPLOYEE_BY_ID, employeeId),
+      this.cacheService.deleteByPrefix(this.cachePrefixes.EMPLOYEE)
+    ]);
     await this.emailQueueService.sendReactivationNotification(
       employee.email,
       employee.name,

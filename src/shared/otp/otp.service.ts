@@ -8,6 +8,7 @@ import * as otpGenerator from 'otp-generator';
 import * as bcrypt from 'bcryptjs';
 import * as SYS_MSG from '@shared/constants/SystemMessages';
 import { CustomHttpException } from '@shared/helpers/custom-http-filter';
+import { Logger } from '@nestjs/common';
 
 
 const OTP_EXPIRY_MINUTES = 15;
@@ -32,6 +33,8 @@ interface CreateOtpResult {
 
 @Injectable()
 export class OtpService {
+  private readonly logger = new Logger(OtpService.name);
+
   constructor(
     @InjectRepository(Otp)
     private otpRepository: Repository<Otp>,
@@ -44,13 +47,15 @@ export class OtpService {
   async create(userId: string, manager?: EntityManager, isEmployee: boolean = false): Promise<CreateOtpResult | null> {
     try {
       const otpRepo = manager ? manager.getRepository(Otp) : this.otpRepository;
+      const userRepo = manager ? manager.getRepository(User) : this.userRepository;
+      const employeeRepo = manager ? manager.getRepository(Employee) : this.employeeRepository;
 
       const { otp, hashedOTP } = await generateOTP();
       const expiry = new Date(Date.now() + OTP_EXPIRY_MS);
 
       // Only check if entity exists, don't load the full entity
       if (isEmployee) {
-        const employeeExists = await this.employeeRepository.exists({ where: { id: userId } });
+        const employeeExists = await employeeRepo.exists({ where: { id: userId } });
         if (!employeeExists) throw new NotFoundException(SYS_MSG.USER_NOT_FOUND);
 
         // Delete any existing OTPs for this employee to prevent accumulation
@@ -65,10 +70,9 @@ export class OtpService {
 
         return { otpEntity, plainOtp: otp };
       } else {
-        const userExists = await this.userRepository.exists({ where: { id: userId } });
+        const userExists = await userRepo.exists({ where: { id: userId } });
         if (!userExists) throw new NotFoundException(SYS_MSG.USER_NOT_FOUND);
 
-        // Delete any existing OTPs for this user to prevent accumulation
         await otpRepo.delete({ user_id: userId });
 
         const otpEntity = otpRepo.create({
@@ -81,7 +85,11 @@ export class OtpService {
         return { otpEntity, plainOtp: otp };
       }
     } catch (error) {
-      return null;
+      this.logger.error(`Failed to create OTP: ${error.message}`, error.stack);
+      if (error instanceof NotFoundException) {
+        throw error;
+      }
+      throw new CustomHttpException(SYS_MSG.FAILED_OTP, HttpStatus.INTERNAL_SERVER_ERROR);
     }
   }
 

@@ -1,4 +1,4 @@
-import { Injectable, HttpStatus } from '@nestjs/common';
+import { Injectable, HttpStatus, Logger } from '@nestjs/common';
 import * as SYS_MSG from '@shared/constants/SystemMessages';
 import { UserService } from '@modules/user/user.service';
 import { OtpService } from '@shared/otp/otp.service';
@@ -10,9 +10,9 @@ import { TokenService } from '@shared/token/token.service';
 import { PasswordService } from './password.service';
 import { timestamp } from '@utils/time';
 import * as bcrypt from 'bcryptjs';
-import { Logger } from '@nestjs/common';
 import { AuthHelperService } from './auth-helper.service';
 import { CreateAuthDto, ForgotPasswordDto, UpdatePasswordDto, LoginResponseDto, LoginDto } from './dto/create-auth.dto';
+import { UserRole } from './interfaces/auth.interface';
 
 @Injectable()
 export class AuthService {
@@ -36,7 +36,7 @@ export class AuthService {
       });
       if (userExists) throw new CustomHttpException(SYS_MSG.USER_ACCOUNT_EXIST, HttpStatus.BAD_REQUEST);
 
-      const user = await this.userService.create(createUserDto, manager);
+      const user = await this.userService.create({ ...createUserDto, role: UserRole.HR }, manager);
       if (!user) throw new CustomHttpException(SYS_MSG.FAILED_TO_CREATE_USER, HttpStatus.BAD_REQUEST);
 
       const otpResult = await this.otpService.create(user.id, manager);
@@ -56,6 +56,7 @@ export class AuthService {
         },
         token: preliminaryToken,
       };
+
       return {
         message: SYS_MSG.VERIFY_OTP_SENT,
         data: responsePayload,

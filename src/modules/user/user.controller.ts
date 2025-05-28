@@ -128,7 +128,7 @@ export class UserController {
   }
 
 
-  @Patch(':employeeId/deactivate')
+  @Post(':employeeId/deactivate')
   @ApiOperation({ summary: 'Deactivate an employee account (HR can only deactivate their own employees)' })
   @ApiResponse({ status: 200, description: 'The employee has been successfully deactivated.' })
   @ApiResponse({ status: 400, description: 'Bad Request or Employee already deactivated' })
@@ -141,7 +141,7 @@ export class UserController {
     return this.userService.deactivateEmployee(hrId, employeeId);
   }
 
-  @Patch(':employeeId/reactivate')
+  @Post(':employeeId/reactivate')
   @ApiOperation({ summary: 'Reactivate an employee account (HR can only reactivate their own employees)' })
   @ApiResponse({ status: 200, description: 'The employee has been successfully reactivated.' })
   @ApiResponse({ status: 400, description: 'Bad Request or Employee already active' })
