@@ -67,6 +67,20 @@ export class AuthController {
     return this.authService.verifyToken(authorization, verifyOtp);
   }
 
+  @Post('resend-otp')
+  @HttpCode(200)
+  @ApiOperation({ summary: 'resend OTP' })
+  @ApiBody({ type: OtpDto })
+  @ApiResponse({ description: 'OTP verified successfully',})
+  @ApiUnauthorizedResponse({
+    description: SYS_MSG.UNAUTHORISED_TOKEN
+  })
+async resendOtp(
+  @Headers('authorization') authorization: string
+): Promise<{ message: string }> {
+  return this.authService.resendOtpWithRateLimit(authorization);
+}
+
 
   @Post('password/forgot')
   @HttpCode(200)

@@ -9,7 +9,7 @@ import { TicketModule } from '@modules/ticket/ticket.module';
 import { ProjectModule } from '@modules/project/project.module';
 import corsConfig from '@config/cors.config';
 import { SalesModule } from '@modules/sales/sales.module';
-import { GatewayModule } from '@modules/gateway/gateway.module';
+import { GatewayModule } from '@modules/payment-gateway/gateway.module';
 import { AuthModule } from '@modules/auth/auth.module';
 import { MailerModule } from '@nestjs-modules/mailer';
 import { HandlebarsAdapter } from '@nestjs-modules/mailer/dist/adapters/handlebars.adapter';
@@ -37,6 +37,9 @@ import { ChatModule } from './modules/chat/chat.module';
 import { EmployeesModule } from './modules/employee/employees.module';
 import { AdminModule } from './modules/admin/admin.module';
 import { SharedModule } from './shared/shared.module';
+import { PricingModule } from './modules/pricing/pricing.module';
+import { SubscriptionModule } from './modules/subscription/subscription.module';
+
 
 @Module({
   providers: [
@@ -210,7 +213,10 @@ import { SharedModule } from './shared/shared.module';
     ChatModule,
     EmployeesModule,
     AdminModule,
-    SharedModule
+    SharedModule,
+    PricingModule,
+    SubscriptionModule
+
   ],
   controllers: [HealthController, ProbeController],
 })

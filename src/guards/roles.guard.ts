@@ -2,12 +2,20 @@ import { Injectable, CanActivate, ExecutionContext, ForbiddenException } from '@
 import { Reflector } from '@nestjs/core';
 import { UserRole } from '@modules/auth/interfaces/auth.interface';
 import { ROLES_KEY } from '@shared/decorators/roles.decorator';
+import { IS_PUBLIC_KEY } from '@shared/helpers/skipAuth';
+
 
 @Injectable()
 export class RolesGuard implements CanActivate {
     constructor(private reflector: Reflector) { }
 
     canActivate(context: ExecutionContext): boolean {
+        const isPublicRoute = this.reflector.getAllAndOverride<boolean>(IS_PUBLIC_KEY, [
+            context.getHandler(),
+            context.getClass(),
+        ]);
+        if (isPublicRoute) return true;
+
         const requiredRoles = this.reflector.getAllAndOverride<UserRole[]>(ROLES_KEY, [
             context.getHandler(),
             context.getClass(),

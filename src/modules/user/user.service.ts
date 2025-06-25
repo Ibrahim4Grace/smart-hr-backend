@@ -45,10 +45,8 @@ export class UserService {
   private uploadsDir: string;
   private readonly logger = new Logger(UserService.name);
   constructor(
-    @InjectRepository(User)
-    private userRepository: Repository<User>,
-    @InjectRepository(Employee)
-    private employeeRepository: Repository<Employee>,
+    @InjectRepository(User) private userRepository: Repository<User>,
+    @InjectRepository(Employee) private employeeRepository: Repository<Employee>,
     private passwordService: PasswordService,
     private readonly cloudinaryService: CloudinaryService,
     private readonly paginationService: PaginationService,

@@ -9,10 +9,15 @@ import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth, ApiBody, ApiQuery, A
 import { Todo, TodoPriority } from './entities/todo.entity';
 import { PriorityValidationPipe } from './pipe/prioritypipe.validation';
 import { PaginationOptions } from '@shared/interfaces/pagination.interface';
+import { UserRole } from '@modules/auth/interfaces/auth.interface';
+import { Roles } from '@shared/decorators/roles.decorator';
+import { RolesGuard } from '@guards/roles.guard';
 
 
 @ApiTags('Todos')
 @ApiBearerAuth()
+@UseGuards(RolesGuard)
+@Roles(UserRole.HR, UserRole.EMPLOYEE)
 @Controller('todos')
 export class TodoController {
   constructor(private readonly todoService: TodoService) { }

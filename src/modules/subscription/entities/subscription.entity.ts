@@ -2,21 +2,55 @@ import { Entity, Column, ManyToOne } from 'typeorm';
 import { AbstractBaseEntity } from '../../../entities/base.entity';
 import { User } from '../../user/entities/user.entity';
 import { Pricing } from '../../pricing/entities/pricing.entity';
+import { SubscriptionStatus, PaymentStatus } from '../interface/subscription.interface';
+
 
 @Entity('subscriptions')
 export class Subscription extends AbstractBaseEntity {
-  @ManyToOne(() => User, (user) => user.subscriptions)
-  user: User;
-
-  @ManyToOne(() => Pricing, (pricing) => pricing.subscriptions)
-  pricing: Pricing;
 
   @Column({ type: 'date' })
-  startDate: Date;
+  start_date: Date;
 
   @Column({ type: 'date', nullable: true })
-  endDate: Date;
+  end_date: Date;
 
-  @Column({ type: 'varchar', length: 50, default: 'Active' })
-  status: string; // e.g., Active, Canceled
+  @Column({
+    type: 'enum', enum: SubscriptionStatus,
+    default: SubscriptionStatus.PENDING,
+  })
+  status: SubscriptionStatus;
+
+  @Column({
+    type: 'enum', enum: PaymentStatus,
+    default: PaymentStatus.PENDING,
+  })
+  payment_status: PaymentStatus;
+
+  @Column({ type: 'decimal', precision: 10, scale: 2, default: 0 })
+  amount_paid: number;
+
+  @Column({ length: 3, default: 'NGN' })
+  currency: string;
+
+  @Column({ nullable: true })
+  paystack_reference: string;
+
+  @Column({ nullable: true })
+  paystack_customer_code: string;
+
+  @Column({ type: 'boolean', default: true })
+  auto_renew: boolean;
+
+  @Column({ type: 'boolean', default: false })
+  is_trial: boolean;
+
+  @ManyToOne(() => Pricing, (pricing) => pricing.subscriptions, { onDelete: 'CASCADE' })
+  pricing: Pricing;
+
+  @ManyToOne(() => User, (user) => user.subscriptions, { onDelete: 'CASCADE' })
+  user: User;
 }
+
+
+
+

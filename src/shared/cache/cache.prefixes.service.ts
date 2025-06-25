@@ -37,6 +37,8 @@ export class CachePrefixesService {
     readonly INVOICE = 'invoice';
     readonly INVOICE_LIST = 'invoice:list';
 
+    readonly PRICING = 'pricing';
+    readonly PRICING_LIST = 'pricing:list';
 
     /**
      * Gets a namespaced cache key by combining a prefix with an identifier

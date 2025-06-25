@@ -1,11 +1,11 @@
-import { Injectable, HttpStatus, Logger } from '@nestjs/common';
+import { Injectable, HttpStatus, NotFoundException, Logger } from '@nestjs/common';
 import * as SYS_MSG from '@shared/constants/SystemMessages';
 import { UserService } from '@modules/user/user.service';
 import { OtpService } from '@shared/otp/otp.service';
 import { EmailQueueService } from '@modules/email-queue/email-queue.service';
 import { CustomHttpException } from '@shared/helpers/custom-http-filter';
 import { CreateUserResponse } from './interfaces/auth.interface';
-import { DataSource, EntityManager } from 'typeorm';
+import { EntityManager, DataSource, MoreThan } from 'typeorm';
 import { TokenService } from '@shared/token/token.service';
 import { PasswordService } from './password.service';
 import { timestamp } from '@utils/time';
@@ -13,6 +13,8 @@ import * as bcrypt from 'bcryptjs';
 import { AuthHelperService } from './auth-helper.service';
 import { CreateAuthDto, ForgotPasswordDto, UpdatePasswordDto, LoginResponseDto, LoginDto } from './dto/create-auth.dto';
 import { UserRole } from './interfaces/auth.interface';
+
+
 
 @Injectable()
 export class AuthService {
@@ -25,6 +27,7 @@ export class AuthService {
     private readonly tokenService: TokenService,
     private passwordService: PasswordService,
     private readonly authHelperService: AuthHelperService,
+
   ) { }
 
 
@@ -100,6 +103,32 @@ export class AuthService {
       message: SYS_MSG.EMAIL_VERIFIED_SUCCESSFULLY,
       data: responsePayload,
     };
+  }
+
+  async resendOtpWithRateLimit(authorization: string): Promise<{ message: string }> {
+    try {
+      const user = await this.authHelperService.validateBearerToken(authorization);
+
+      const otpResult = await this.otpService.resend(user.id, undefined, false, true);
+      if (!otpResult) throw new CustomHttpException(SYS_MSG.FAILED_OTP, HttpStatus.INTERNAL_SERVER_ERROR);
+
+      await this.emailService.sendUserEmailConfirmationOtp(
+        user.email,
+        user.name,
+        otpResult.plainOtp
+      );
+      this.logger.log(`Successfully resent OTP email to ${user.email} with OTP: ${otpResult.plainOtp}`);
+
+      return {
+        message: 'OTP has been resent successfully'
+      };
+    } catch (error) {
+      this.logger.error(`Failed to resend OTP: ${error.message}`, error.stack);
+      if (error instanceof CustomHttpException || error instanceof NotFoundException) {
+        throw error;
+      }
+      throw new CustomHttpException(SYS_MSG.FAILED_OTP, HttpStatus.INTERNAL_SERVER_ERROR);
+    }
   }
 
   async forgotPassword(dto: ForgotPasswordDto): Promise<{ message: string; token: string }> {

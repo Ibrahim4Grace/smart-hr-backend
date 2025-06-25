@@ -36,13 +36,26 @@ export class OtpService {
   private readonly logger = new Logger(OtpService.name);
 
   constructor(
-    @InjectRepository(Otp)
-    private otpRepository: Repository<Otp>,
-    @InjectRepository(User)
-    private userRepository: Repository<User>,
-    @InjectRepository(Employee)
-    private employeeRepository: Repository<Employee>,
+    @InjectRepository(Otp) private otpRepository: Repository<Otp>,
+    @InjectRepository(User) private userRepository: Repository<User>,
+    @InjectRepository(Employee) private employeeRepository: Repository<Employee>,
   ) { }
+  
+
+    async hasRecentOtp(userId: string, isEmployee: boolean = false, withinMinutes: number = 1): Promise<boolean> {
+     const whereClause = isEmployee ? { employee_id: userId } : { user_id: userId };
+      const cutoffTime = new Date(Date.now() - (withinMinutes * 60 * 1000));
+  
+      const recentOtp = await this.otpRepository.findOne({
+         where: {
+         ...whereClause,
+        created_at: MoreThan(cutoffTime)
+       },
+      select: ['id', 'created_at']
+    });
+
+     return !!recentOtp;
+   }
 
   async create(userId: string, manager?: EntityManager, isEmployee: boolean = false): Promise<CreateOtpResult | null> {
     try {
@@ -115,6 +128,62 @@ export class OtpService {
 
     return true;
   }
+
+  async resend(
+    userId: string, manager?: EntityManager, 
+    isEmployee: boolean = false,
+     checkRateLimit: boolean = true
+  ): Promise<CreateOtpResult | null> {
+  try {
+    const otpRepo = manager ? manager.getRepository(Otp) : this.otpRepository;
+    const userRepo = manager ? manager.getRepository(User) : this.userRepository;
+    const employeeRepo = manager ? manager.getRepository(Employee) : this.employeeRepository;
+
+    // Check if user/employee exists
+    if (isEmployee) {
+      const employeeExists = await employeeRepo.exists({ where: { id: userId } });
+      if (!employeeExists) throw new NotFoundException(SYS_MSG.EMPLOYEE_NOT_FOUND);
+    } else {
+      const userExists = await userRepo.exists({ where: { id: userId } });
+      if (!userExists) throw new NotFoundException(SYS_MSG.USER_NOT_FOUND);
+    }
+
+      // Check rate limit
+    if (checkRateLimit) {
+      const hasRecentOtp = await this.hasRecentOtp(userId, isEmployee, 1); // 1 minute
+      if (hasRecentOtp) {
+        throw new CustomHttpException(SYS_MSG.WAIT_A_MIN, HttpStatus.TOO_MANY_REQUESTS);
+      }
+    }
+
+    // Generate new OTP
+    const { otp, hashedOTP } = await generateOTP();
+    const expiry = new Date(Date.now() + OTP_EXPIRY_MS);
+
+    const whereClause = isEmployee ? { employee_id: userId } : { user_id: userId };
+
+    await otpRepo.delete(whereClause);
+
+    // Create new OTP
+    const otpEntity = otpRepo.create({
+      otp: hashedOTP,
+      expiry,
+      ...(isEmployee ? { employee_id: userId } : { user_id: userId })
+    });
+
+    await otpRepo.save(otpEntity);
+
+    this.logger.log(`OTP resent successfully for ${isEmployee ? 'employee' : 'user'}: ${userId}`);
+    
+    return { otpEntity, plainOtp: otp };
+  } catch (error) {
+    this.logger.error(`Failed to resend OTP: ${error.message}`, error.stack);
+    if (error instanceof NotFoundException) {
+      throw error;
+    }
+    throw new CustomHttpException(SYS_MSG.FAILED_OTP, HttpStatus.INTERNAL_SERVER_ERROR);
+  }
+}
 
   async isOtpVerified(userId: string, isEmployee: boolean = false): Promise<boolean> {
     const whereClause = isEmployee

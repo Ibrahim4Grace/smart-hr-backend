@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Body, Patch, Param, Delete, Query } from '@nestjs/common';
+import { Controller, Get, Post, Body, Patch, Param, Delete, Query, UseGuards } from '@nestjs/common';
 import { NotesService } from './notes.service';
 import { CreateNoteDto } from './dto/create-note.dto';
 import { GetUser } from '@shared/decorators/user.decorator';
@@ -7,9 +7,14 @@ import { ApiBearerAuth, ApiOperation, ApiParam, ApiQuery, ApiResponse } from '@n
 import { ApiTags } from '@nestjs/swagger';
 import { Note, NotePriority } from './entities/note.entity';
 import { PriorityValidationPipe } from '@modules/notes/pipe/prioritypipe.validation';
+import { UserRole } from '@modules/auth/interfaces/auth.interface';
+import { Roles } from '@shared/decorators/roles.decorator';
+import { RolesGuard } from '@guards/roles.guard';
 
 @ApiTags('Notes')
 @ApiBearerAuth()
+@UseGuards(RolesGuard)
+@Roles(UserRole.HR, UserRole.EMPLOYEE)
 @Controller('notes')
 export class NotesController {
   constructor(private readonly notesService: NotesService) { }

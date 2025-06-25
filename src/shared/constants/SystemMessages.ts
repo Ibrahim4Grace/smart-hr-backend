@@ -27,9 +27,12 @@ export const INVALID_PASSWORD = 'Invalid password';
 export const PASSWORD_CHANGE_FAILED = 'Failed to change password';
 export const EMPLOYEE_NOT_FOUND = 'Employee not found';
 export const HR_NOT_FOUND = 'HR not found';
+export const DUPLICATE_PRICING = 'pricing plan with this name and configuration already exists';
+export const PRICING_NOT_FOUND = 'ricing plan not found';
+export const CANNOT_DELETE_ACTIVE_PLAN = 'Cannot delete a plan with active subscriptions';
+export const CANNOT_UPDATE_ACTIVE_PLAN = 'Cannot update price of a plan with active subscriptions';
 
-
-
+export const WAIT_A_MIN ='Please wait at least 1 minute before requesting a new OTP';
 export const BAD_REQUEST = 'Bad Request';
 
 export const OK = 'Success';
