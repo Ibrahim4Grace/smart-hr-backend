@@ -1,5 +1,5 @@
 import { InjectRepository } from '@nestjs/typeorm';
-import { HttpStatus, Injectable, ForbiddenException, BadRequestException } from '@nestjs/common';
+import { HttpStatus, Injectable, BadRequestException } from '@nestjs/common';
 import { EntityManager, Repository } from 'typeorm';
 import { PasswordService } from '../auth/password.service';
 import { User } from './entities/user.entity';
@@ -9,28 +9,10 @@ import { UserRole } from '@modules/auth/interfaces/auth.interface';
 import { EmailQueueService } from '@modules/email-queue/email-queue.service';
 import { Logger } from '@nestjs/common';
 import { timestamp } from '@utils/time';
-import * as sharp from 'sharp';
-import * as fs from 'fs';
-import * as path from 'path';
 import { UploadUserProfilePicDto } from './dto/upload-profile-pic.dto';
 import { PROFILE_PHOTO_UPLOADS } from '@shared/constants/SystemMessages';
-import { pipeline, Readable } from 'stream';
-import {
-  UserResponseDTO,
-  PaginatedUsersResponse,
-  UpdateUserResponseDTO,
-  UpdateUserDto,
-  DeleteUserResponse,
-} from './dto/create-user.dto';
-import {
-  UserPayload,
-  UpdateUserRecordOption,
-  CreateNewUserOptions,
-  UserIdentifierOptionsType,
-} from './interface/user.interface';
 import { CloudinaryService } from '@shared/services/cloudinary.service';
 import { PaginationService } from '@shared/services/pagination.service';
-import { FindOptionsOrder } from 'typeorm';
 import { EntityPermissionsService } from '@shared/services/permissions.service';
 import { PaginationOptions } from '@shared/interfaces/pagination.interface';
 import { CacheService } from '@shared/cache/cache.service';
@@ -38,6 +20,17 @@ import { CachePrefixesService } from '@shared/cache/cache.prefixes.service';
 import { Employee } from '@modules/employee/entities/employee.entity';
 import { CreateEmployeeDto } from '@modules/employee/dto/create-employee.dto';
 import { ChangePasswordDto } from '@modules/employee/dto/change-password.dto';
+import {
+  UserResponseDTO,
+  UpdateUserResponseDTO,
+  UpdateUserDto,
+  DeleteUserResponse,
+} from './dto/create-user.dto';
+import {
+  UpdateUserRecordOption,
+  CreateNewUserOptions,
+  UserIdentifierOptionsType,
+} from './interface/user.interface';
 
 
 @Injectable()

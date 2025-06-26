@@ -1,11 +1,10 @@
-import { Column, Entity, ManyToOne } from 'typeorm';
+import { Column, Entity, ManyToOne, Index } from 'typeorm';
 import { AbstractBaseEntity } from '../../../entities/base.entity';
 import { Employee } from '../../employee/entities/employee.entity';
 
 @Entity('attendances')
 export class Attendance extends AbstractBaseEntity {
-  @ManyToOne(() => Employee, (employee) => employee.attendances)
-  employee: Employee;
+
 
   @Column({ nullable: true })
   date: Date;
@@ -18,4 +17,8 @@ export class Attendance extends AbstractBaseEntity {
 
   @Column({ length: 50 })
   status: string; // e.g., Present, Absent, Late
+
+  @Index()
+  @ManyToOne(() => Employee, (employee) => employee.attendances, { onDelete: 'CASCADE' })
+  employee: Employee;
 }

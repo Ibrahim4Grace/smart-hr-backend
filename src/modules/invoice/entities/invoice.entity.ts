@@ -8,7 +8,7 @@ export class Invoice extends AbstractBaseEntity {
     title: string;
 
     @Index()
-    @ManyToOne(() => User, user => user.invoices)
+    @ManyToOne(() => User, user => user.invoices, { onDelete: 'CASCADE' })
     @JoinColumn({ name: 'user_id' })
     user: User;
 }

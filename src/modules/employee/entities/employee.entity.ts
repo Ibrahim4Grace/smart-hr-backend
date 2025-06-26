@@ -1,4 +1,4 @@
-import { Entity, Column, OneToMany, JoinColumn, ManyToOne } from 'typeorm';
+import { Entity, Column, OneToMany, JoinColumn, Index, ManyToOne } from 'typeorm';
 import { AbstractBaseEntity } from '../../../entities/base.entity';
 import { Attendance } from '../../attendance/entities/attendance.entity';
 import { Leave } from '../../leave/entities/leave.entity';
@@ -75,7 +75,8 @@ export class Employee extends AbstractBaseEntity {
   managedProjects: Project[];
 
   //relationship to track which HR added this employee
-  @ManyToOne(() => User)
+  @Index()
+  @ManyToOne(() => User, (user) => user.employees, { onDelete: 'CASCADE' })
   @JoinColumn({ name: 'added_by_hr_id' })
   added_by_hr: User;
 }

@@ -24,7 +24,7 @@ export class Calendar extends AbstractBaseEntity {
     description: string;
 
     @Index()
-    @ManyToOne(() => User, user => user.calendars)
+    @ManyToOne(() => User, user => user.calendars, { onDelete: 'CASCADE' })
     @JoinColumn({ name: 'user_id' })
     user: User;
 

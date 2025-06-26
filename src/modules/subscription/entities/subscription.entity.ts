@@ -1,4 +1,4 @@
-import { Entity, Column, ManyToOne } from 'typeorm';
+import { Entity, Column, ManyToOne, Index } from 'typeorm';
 import { AbstractBaseEntity } from '../../../entities/base.entity';
 import { User } from '../../user/entities/user.entity';
 import { Pricing } from '../../pricing/entities/pricing.entity';
@@ -44,9 +44,11 @@ export class Subscription extends AbstractBaseEntity {
   @Column({ type: 'boolean', default: false })
   is_trial: boolean;
 
+  @Index()
   @ManyToOne(() => Pricing, (pricing) => pricing.subscriptions, { onDelete: 'CASCADE' })
   pricing: Pricing;
 
+  @Index()
   @ManyToOne(() => User, (user) => user.subscriptions, { onDelete: 'CASCADE' })
   user: User;
 }

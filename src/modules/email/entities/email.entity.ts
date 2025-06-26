@@ -1,13 +1,10 @@
-import { Entity, Column, ManyToOne, JoinColumn } from 'typeorm';
+import { Entity, Column, ManyToOne, JoinColumn, Index } from 'typeorm';
 import { User } from '../../user/entities/user.entity';
 import { AbstractBaseEntity } from '@entities/base.entity';
 
 @Entity('email_accounts')
 export class EmailAccount extends AbstractBaseEntity {
 
-    @ManyToOne(() => User)
-    @JoinColumn({ name: 'user_id' })
-    user: User;
 
     @Column({ name: 'user_id' })
     userId: string;
@@ -43,4 +40,10 @@ export class EmailAccount extends AbstractBaseEntity {
         mimetype: string;
         cloudinaryUrl?: string;
     }>;
+
+    @Index()
+    @ManyToOne(() => User, { onDelete: 'CASCADE' })
+    @JoinColumn({ name: 'user_id' })
+    user: User;
+
 }

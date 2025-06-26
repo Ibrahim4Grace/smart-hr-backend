@@ -55,7 +55,7 @@ export class Todo extends AbstractBaseEntity {
   assigned_to: string;
 
   @Index()
-  @ManyToOne(() => User, user => user.todos)
+  @ManyToOne(() => User, user => user.todos, { onDelete: 'CASCADE' })
   @JoinColumn({ name: 'user_id' })
   user: User;
 }

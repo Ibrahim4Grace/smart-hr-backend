@@ -1,4 +1,4 @@
-import { Entity, Column, ManyToOne, ManyToMany, JoinTable } from 'typeorm';
+import { Entity, Column, ManyToOne, ManyToMany, JoinTable, Index } from 'typeorm';
 import { AbstractBaseEntity } from '../../../entities/base.entity';
 import { Employee } from '../../employee/entities/employee.entity';
 
@@ -16,7 +16,8 @@ export class Project extends AbstractBaseEntity {
   @Column({ type: 'date', nullable: true })
   endDate: Date;
 
-  @ManyToOne(() => Employee, (employee) => employee.managedProjects)
+  @Index()
+  @ManyToOne(() => Employee, (employee) => employee.managedProjects, { onDelete: 'CASCADE' })
   manager: Employee;
 
   @ManyToMany(() => Employee)

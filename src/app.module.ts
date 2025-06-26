@@ -9,7 +9,6 @@ import { TicketModule } from '@modules/ticket/ticket.module';
 import { ProjectModule } from '@modules/project/project.module';
 import corsConfig from '@config/cors.config';
 import { SalesModule } from '@modules/sales/sales.module';
-import { GatewayModule } from '@modules/payment-gateway/gateway.module';
 import { AuthModule } from '@modules/auth/auth.module';
 import { MailerModule } from '@nestjs-modules/mailer';
 import { HandlebarsAdapter } from '@nestjs-modules/mailer/dist/adapters/handlebars.adapter';
@@ -205,7 +204,6 @@ import { SubscriptionModule } from './modules/subscription/subscription.module';
     TicketModule,
     ProjectModule,
     SalesModule,
-    GatewayModule,
     CalendarModule,
     NotesModule,
     InvoiceModule,

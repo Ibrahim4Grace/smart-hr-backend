@@ -64,7 +64,7 @@ export class PricingService {
             },
           );
         },
-        this.cacheService.CACHE_TTL.LONG
+        this.cacheService.CACHE_TTL.VERY_LONG
       );
     } catch (error) {
       throw new HttpException(
@@ -163,13 +163,21 @@ export class PricingService {
 
   async findByRegion(region: Region, options: PaginationOptions<Pricing> = {}) {
     try {
-      return await this.paginationService.paginate(
-        this.pricingRepository,
-        { region, isActive: true },
-        {
-          ...options,
-          order: options.order || { price: 'ASC' },
+      const cacheKey = `region_${region}_${JSON.stringify(options)}`;
+      return await this.cacheService.getOrSet(
+        this.cachePrefixes.PRICING_LIST,
+        cacheKey,
+        async () => {
+          return await this.paginationService.paginate(
+            this.pricingRepository,
+            { region, isActive: true },
+            {
+              ...options,
+              order: options.order || { price: 'ASC' },
+            },
+          );
         },
+        this.cacheService.CACHE_TTL.VERY_LONG
       );
     } catch (error) {
       throw new HttpException(
@@ -181,13 +189,21 @@ export class PricingService {
 
   async findByAccessType(accessType: AccessType, options: PaginationOptions<Pricing> = {}) {
     try {
-      return await this.paginationService.paginate(
-        this.pricingRepository,
-        { access_type: accessType, isActive: true },
-        {
-          ...options,
-          order: options.order || { price: 'ASC' },
+      const cacheKey = `access_type_${accessType}_${JSON.stringify(options)}`;
+      return await this.cacheService.getOrSet(
+        this.cachePrefixes.PRICING_LIST,
+        cacheKey,
+        async () => {
+          return await this.paginationService.paginate(
+            this.pricingRepository,
+            { access_type: accessType, isActive: true },
+            {
+              ...options,
+              order: options.order || { price: 'ASC' },
+            },
+          );
         },
+        this.cacheService.CACHE_TTL.VERY_LONG
       );
     } catch (error) {
       throw new HttpException(

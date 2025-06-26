@@ -37,7 +37,7 @@ export class Note extends AbstractBaseEntity {
     dueDate: Date;
 
     @Index()
-    @ManyToOne(() => User, user => user.notes)
+    @ManyToOne(() => User, user => user.notes, { onDelete: 'CASCADE' })
     @JoinColumn({ name: 'user_id' })
     user: User;
 

@@ -11,17 +11,9 @@ export class Otp extends AbstractBaseEntity {
   @Column()
   expiry: Date;
 
-  @ManyToOne(() => User, { nullable: true })
-  @JoinColumn({ name: 'user_id' })
-  user: User;
-
   @Index()
   @Column({ nullable: true })
   user_id: string;
-
-  @ManyToOne(() => Employee, { nullable: true })
-  @JoinColumn({ name: 'employee_id' })
-  employee: Employee;
 
   @Index()
   @Column({ nullable: true })
@@ -29,4 +21,14 @@ export class Otp extends AbstractBaseEntity {
 
   @Column({ default: false })
   verified: boolean;
+
+  @Index()
+  @ManyToOne(() => Employee, { nullable: true })
+  @JoinColumn({ name: 'employee_id' })
+  employee: Employee;
+
+  @Index()
+  @ManyToOne(() => User, { nullable: true })
+  @JoinColumn({ name: 'user_id' })
+  user: User;
 } 
