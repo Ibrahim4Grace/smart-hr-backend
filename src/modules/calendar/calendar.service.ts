@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, Between } from 'typeorm';
 import { CreateCalendarDto } from './dto/create-calendar.dto';
@@ -6,18 +6,22 @@ import { UpdateCalendarDto } from './dto/update-calendar.dto';
 import { Calendar } from './entities/calendar.entity';
 import { User } from '../user/entities/user.entity';
 import { EntityPermissionsService } from '@shared/services/permissions.service';
-import { Todo } from '@modules/todo/entities/todo.entity';
+import { PaginationService } from '@shared/services/pagination.service';
+import { SSEService } from '@shared/sse/sse.service';
+
 
 
 
 @Injectable()
 export class CalendarService {
+  private readonly logger = new Logger(CalendarService.name);
+
   constructor(
     @InjectRepository(Calendar)
     private readonly calendarRepository: Repository<Calendar>,
-    @InjectRepository(User)
-    private readonly userRepository: Repository<User>,
     private readonly permissionsService: EntityPermissionsService,
+    private readonly paginationService: PaginationService,
+    private readonly sseService: SSEService,
   ) { }
 
   async create(createCalendarDto: CreateCalendarDto, userId: string) {
@@ -26,26 +30,39 @@ export class CalendarService {
       ...createCalendarDto,
       user: { id: user.id }
     });
-    return await this.calendarRepository.save(calendar);
+    await this.calendarRepository.save(calendar);
+    return {
+      statusCode: 201,
+      message: 'Event created successfully',
+    };
   }
 
-  async findAll(userId: string, startTime?: Date, endTime?: Date) {
-    const queryOptions: any = {
-      where: { user: { id: userId } },
-      order: {
-        startTime: 'ASC',
-      },
-      relations: ['user'],
-    };
 
+  async findAll(userId: string, startTime?: Date, endTime?: Date, page = 1, limit = 10) {
+    const where: any = { user: { id: userId } };
     if (startTime && endTime) {
-      queryOptions.where = {
-        ...queryOptions.where,
-        startTime: Between(startTime, endTime),
-      };
+      where.event_date = Between(startTime, endTime);
     }
+    const select: (keyof Calendar)[] = [
+      'id',
+      'title',
+      'event_date',
+      'start_time',
+      'end_time',
+      'location',
+      'description',
+    ];
 
-    return await this.calendarRepository.find(queryOptions);
+    return this.paginationService.paginate(
+      this.calendarRepository,
+      where,
+      {
+        page,
+        limit,
+        order: { start_time: 'ASC' },
+        select
+      }
+    );
   }
 
   async findOne(id: string, userId: string) {
@@ -68,18 +85,59 @@ export class CalendarService {
 
   }
 
+
   async findUpcoming(userId: string, limit: number = 5) {
     const now = new Date();
-    return await this.calendarRepository.find({
+    const events = await this.calendarRepository.find({
       where: {
         user: { id: userId },
-        startTime: Between(now, new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000)), // Next 30 days
+        event_date: Between(now, new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000)),
       },
       order: {
-        startTime: 'ASC',
+        start_time: 'ASC',
       },
       take: limit,
-      relations: ['user'],
+      select: [
+        'id',
+        'title',
+        'event_date',
+        'start_time',
+        'end_time',
+        'location',
+        'description',
+      ],
     });
+    return {
+      status_code: 200,
+      data: events,
+    };
   }
+
+
+  // async findUpcoming(userId: string, limit: number = 5) {
+  //   const now = new Date();
+  //   const events = await this.calendarRepository.find({
+  //     where: {
+  //       user: { id: userId },
+  //       event_date: Between(now, new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000)),
+  //     },
+  //     order: {
+  //       start_time: 'ASC',
+  //     },
+  //     take: limit,
+  //     select: [
+  //       'id',
+  //       'title',
+  //       'event_date',
+  //       'start_time',
+  //       'end_time',
+  //       'location',
+  //       'description',
+  //     ],
+  //   });
+  //   return {
+  //     status_code: 200,
+  //     data: events,
+  //   };
+  // }
 }

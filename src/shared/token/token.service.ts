@@ -53,7 +53,7 @@ export class TokenService {
     try {
       const secret = this.configService.get<string>('JWT_REFRESH_SECRET');
       if (!secret) throw new Error('JWT_REFRESH_SECRET is not defined');
-      return this.jwtService.verify<AuthJwtPayload>(token, { secret });
+      return this.jwtService.verify<RefreshTokenPayload>(token, { secret });
     } catch (error) {
       this.handleTokenError(error, 'Refresh token');
     }

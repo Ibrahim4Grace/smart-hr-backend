@@ -63,6 +63,19 @@ export class GatewayService {
     callback_url?: string;
   }) {
     try {
+      // Handle free trials (amount = 0)
+      if (data.amount === 0) {
+        return {
+          status: true,
+          message: 'Free trial - no payment required',
+          data: {
+            reference: `FREE_TRIAL_${Date.now()}`,
+            authorization_url: null,
+            access_code: null,
+          }
+        };
+      }
+
       const response = await axios.post(
         `${this.baseUrl}/transaction/initialize`,
         {

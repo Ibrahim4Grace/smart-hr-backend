@@ -15,12 +15,13 @@ import { Repository } from 'typeorm';
 import { TokenService } from './token/token.service';
 import { JwtModule } from '@nestjs/jwt';
 import { ConfigModule } from '@nestjs/config';
+import { SSEService } from './sse/sse.service';
 
 @Module({
     imports: [
         TypeOrmModule.forFeature([Otp, User, Employee]),
         JwtModule.register({}),
-        ConfigModule
+        ConfigModule,
     ],
     providers: [
         OtpService,
@@ -32,7 +33,8 @@ import { ConfigModule } from '@nestjs/config';
         CacheService,
         CachePrefixesService,
         NotificationGateway,
-        NotificationService
+        NotificationService,
+        SSEService
     ],
     exports: [
         OtpService,
@@ -43,7 +45,8 @@ import { ConfigModule } from '@nestjs/config';
         CacheService,
         CachePrefixesService,
         NotificationGateway,
-        NotificationService
+        NotificationService,
+        SSEService
     ]
 })
 export class SharedModule { }

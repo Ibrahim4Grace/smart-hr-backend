@@ -29,6 +29,18 @@ export class User extends AbstractBaseEntity {
   address: string;
 
   @Column({ nullable: true })
+  country: string;
+
+  @Column({ nullable: true })
+  city: string;
+
+  @Column({ nullable: true })
+  state: string;
+
+  @Column({ nullable: true })
+  zip_code: string;
+
+  @Column({ nullable: true })
   company: string;
 
   @Column({ nullable: true })

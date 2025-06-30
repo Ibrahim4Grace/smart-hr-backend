@@ -11,15 +11,17 @@ export class PaginationService {
     ): Promise<PaginatedResponse<T>> {
         const { page = 1, limit = 10, order = { created_at: 'DESC' } as unknown as FindOptionsOrder<T>, relations = [], select } = options;
 
-        const [data, total] = await repository.findAndCount({
+        const findOptions: any = {
             where,
             relations,
             order,
-            select,
             skip: (page - 1) * limit,
             take: limit,
-        });
+        };
 
+        if (select) findOptions.select = select;
+
+        const [data, total] = await repository.findAndCount(findOptions);
         return {
             data,
             meta: {

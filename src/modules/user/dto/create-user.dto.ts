@@ -110,6 +110,30 @@ export class UpdateUserDto {
   password?: string;
 
   @ApiProperty({
+    description: 'The current password of the hr',
+    example: 'password123',
+  })
+  @IsOptional()
+  @IsString()
+  current_password?: string;
+
+  @ApiProperty({
+    description: 'The confirm password of the hr',
+    example: 'password123',
+  })
+  @IsOptional()
+  @IsString()
+  confirm_password?: string;
+
+  @ApiProperty({
+    description: 'The new password of the hr',
+    example: 'password123',
+  })
+  @IsOptional()
+  @IsString()
+  new_password?: string;
+
+  @ApiProperty({
     description: 'The phone number of the hr',
     example: '1234567890',
   })
@@ -124,6 +148,38 @@ export class UpdateUserDto {
   @IsOptional()
   @IsString()
   address?: string;
+
+  @ApiProperty({
+    description: 'The city of the hr',
+    example: 'New York',
+  })
+  @IsOptional()
+  @IsString()
+  city?: string;
+
+  @ApiProperty({
+    description: 'The state of the hr',
+    example: 'New York',
+  })
+  @IsOptional()
+  @IsString()
+  state?: string;
+
+  @ApiProperty({
+    description: 'The zip code of the hr',
+    example: '10001',
+  })
+  @IsOptional()
+  @IsString()
+  zip_code?: string;
+
+  @ApiProperty({
+    description: 'The country of the hr',
+    example: 'United States',
+  })
+  @IsOptional()
+  @IsString()
+  country?: string;
 
   @ApiProperty({
     description: 'The company',
@@ -149,11 +205,6 @@ export class UpdateUserDto {
 export interface UpdateUserResponseDTO {
   status: string;
   message: string;
-  user: {
-    id: string;
-    name: string;
-    phone: string;
-  };
 }
 
 export class UpdateUserStatusDto {

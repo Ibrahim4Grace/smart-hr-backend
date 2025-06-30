@@ -8,14 +8,15 @@ export class Calendar extends AbstractBaseEntity {
     @Column({ type: 'varchar', length: 255 })
     title: string;
 
+    @Index()
     @Column({ type: 'timestamp' })
-    eventDate: Date;
+    event_date: Date;
 
     @Column({ type: 'timestamp' })
-    startTime: Date;
+    start_time: Date;
 
     @Column({ type: 'timestamp' })
-    endTime: Date;
+    end_time: Date;
 
     @Column({ type: 'varchar', length: 100, nullable: true })
     location: string;

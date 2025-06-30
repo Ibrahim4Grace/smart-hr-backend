@@ -61,6 +61,7 @@ export class AdminController {
     }
 
 
+
     @Get('hr/:hrId')
     @ApiOperation({ summary: 'Get HR user by ID' })
     @ApiResponse({ status: 200, description: 'HR user retrieved successfully' })
@@ -94,21 +95,6 @@ export class AdminController {
         @Param('targetHrId') targetHrId: string,
         @GetUser('userId') adminId: string,) {
         return this.adminService.remove(adminId, targetHrId);
-    }
-
-    @Patch(':userId')
-    @ApiOperation({ summary: 'Update Admin' })
-    @ApiResponse({
-        status: 200,
-        description: 'Admin updated successfully',
-        type: UpdateUserDto,
-    })
-    async updateAdmin(
-        @GetUser('userId') currentUserId: string,
-        @Param('userId') userId: string,
-        @Body() updatedUserDto: UpdateUserDto,
-    ) {
-        return this.adminService.update(userId, updatedUserDto, currentUserId);
     }
 
     @Post(':hrId/deactivate')

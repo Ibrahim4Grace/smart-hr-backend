@@ -71,15 +71,15 @@ export class AuthController {
   @HttpCode(200)
   @ApiOperation({ summary: 'resend OTP' })
   @ApiBody({ type: OtpDto })
-  @ApiResponse({ description: 'OTP verified successfully',})
+  @ApiResponse({ description: 'OTP verified successfully', })
   @ApiUnauthorizedResponse({
     description: SYS_MSG.UNAUTHORISED_TOKEN
   })
-async resendOtp(
-  @Headers('authorization') authorization: string
-): Promise<{ message: string }> {
-  return this.authService.resendOtpWithRateLimit(authorization);
-}
+  async resendOtp(
+    @Headers('authorization') authorization: string
+  ): Promise<{ message: string }> {
+    return this.authService.resendOtpWithRateLimit(authorization);
+  }
 
 
   @Post('password/forgot')
@@ -137,7 +137,7 @@ async resendOtp(
   }
 
 
-  @Post('refresh-token')
+  @Post('refresh')
   @ApiOperation({ summary: 'Refresh access token' })
   @ApiBody({ type: RefreshTokenDto })
   @ApiResponse({ status: 200, description: 'Access token refreshed successfully' })

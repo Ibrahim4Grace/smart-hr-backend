@@ -8,7 +8,10 @@ import { User } from '../user/entities/user.entity';
 import { ConfigService } from '@nestjs/config';
 import { CustomHttpException } from '@shared/helpers/custom-http-filter';
 import * as SYS_MSG from '@shared/constants/SystemMessages';
-import { SubscriptionStatus, PaymentStatus, SubscribeToPlanRequest, SubscriptionResponse, PostLoginSubscriptionResponse } from './interface/subscription.interface';
+import {
+  SubscriptionStatus, PaymentStatus, SubscribeToPlanRequest,
+  SubscriptionResponse, PostLoginSubscriptionResponse
+} from './interface/subscription.interface';
 
 @Injectable()
 export class SubscriptionService {
@@ -23,9 +26,6 @@ export class SubscriptionService {
 
   ) { }
 
-
-
-
   private async initiatePaidSubscription(subscription: Subscription) {
     const pricing = subscription.pricing;
     const user = subscription.user;
@@ -35,7 +35,7 @@ export class SubscriptionService {
       amount: pricing.price,
       email: user.email,
       currency: subscription.currency,
-      callback_url: `${this.configService.get<string>('FRONTEND_URL')}/subscription/callback`,
+      callback_url: `${this.configService.get<string>('FRONTEND_URL') || 'http://localhost:8080'}/hr/payment-callback`,
     });
 
     // Update subscription with payment reference
@@ -46,21 +46,17 @@ export class SubscriptionService {
     return {
       subscription,
       paymentUrl: transaction.data.authorization_url,
-      message: 'Proceed to payment to activate subscription',
+      message: transaction.data.authorization_url
+        ? 'Proceed to payment to activate subscription'
+        : 'Free trial - no payment required',
     };
   }
 
   private async activateFreeTrial(subscription: Subscription) {
-    const endDate = new Date(subscription.start_date);
-
-    // Set trial duration
-    if (subscription.pricing.duration === '2 days') {
-      endDate.setDate(endDate.getDate() + 2);
-    }
-
+    // Set trial duration using calculateEndDate for consistency
     subscription.status = SubscriptionStatus.ACTIVE;
     subscription.payment_status = PaymentStatus.NOT_REQUIRED;
-    subscription.end_date = endDate;
+    subscription.end_date = this.calculateEndDate(subscription.start_date, subscription.pricing.duration);
     subscription.is_trial = true;
 
     await this.subscriptionRepository.save(subscription);
@@ -68,7 +64,7 @@ export class SubscriptionService {
     return {
       subscription,
       message: 'Free trial activated successfully',
-      trialEndsAt: endDate,
+      trialEndsAt: subscription.end_date,
     };
   }
 
@@ -94,11 +90,14 @@ export class SubscriptionService {
 
   // Helper method to calculate days until expiry
   private calculateDaysUntilExpiry(endDate: Date): number {
+    if (!endDate || !(endDate instanceof Date)) {
+      endDate = new Date(endDate);
+    }
+
     const now = new Date();
     const timeDiff = endDate.getTime() - now.getTime();
     return Math.ceil(timeDiff / (1000 * 60 * 60 * 24));
   }
-
 
   // Handle successful payment
   private async handlePaymentSuccess(data: any) {
@@ -114,13 +113,12 @@ export class SubscriptionService {
       subscription.paystack_customer_code = data.customer?.customer_code;
 
       // Calculate end date
-      const endDate = new Date(subscription.start_date);
-      this.calculateEndDate(endDate, subscription.pricing.duration);
-      subscription.end_date = endDate;
+      subscription.end_date = this.calculateEndDate(subscription.start_date, subscription.pricing.duration);
 
       await this.subscriptionRepository.save(subscription);
 
       this.logger.log(`Subscription activated: ${subscription.id}`);
+
     }
   }
 
@@ -133,6 +131,145 @@ export class SubscriptionService {
       relations: ['pricing'],
     });
   }
+
+  async subscribeToPlan(userId: string, planData: SubscribeToPlanRequest): Promise<SubscriptionResponse> {
+    try {
+      const user = await this.userRepository.findOne({ where: { id: userId } });
+      if (!user) throw new CustomHttpException(SYS_MSG.USER_NOT_FOUND, HttpStatus.NOT_FOUND);
+
+      // Check if user already has an active subscription
+      const existingSubscription = await this.getUserActiveSubscription(userId);
+      if (existingSubscription) {
+        return {
+          success: true,
+          message: 'You already have an active subscription',
+          subscription: existingSubscription,
+          isTrial: existingSubscription.is_trial,
+        };
+      }
+
+      // Get the pricing plan
+      const pricing = await this.pricingRepository.findOne({
+        where: { id: planData.plan_id, isActive: true }
+      });
+      if (!pricing) throw new CustomHttpException(SYS_MSG.PRICE_NOT_FOUND, HttpStatus.NOT_FOUND);
+
+      // Check if it's a free trial plan (price = 0 or duration = '2 days')
+      const isFreeTrial = pricing.price === 0 || pricing.duration === '2 days';
+
+      if (isFreeTrial) {
+        const subscription = this.subscriptionRepository.create({
+          user,
+          pricing,
+          start_date: new Date(),
+          status: SubscriptionStatus.ACTIVE,
+          payment_status: PaymentStatus.NOT_REQUIRED,
+          amount_paid: 0,
+          currency: pricing.currency,
+          is_trial: false,
+        });
+
+
+        const endDate = new Date();
+        endDate.setDate(endDate.getDate() + 2); // 2-day trial 
+        subscription.end_date = endDate;
+
+        const savedSubscription = await this.subscriptionRepository.save(subscription);
+
+        return {
+          success: true,
+          message: 'Free trial activated successfully!',
+          subscription: savedSubscription,
+          trialEndsAt: endDate,
+        };
+      }
+
+      // Handle paid plans
+      // Create pending subscription
+      const subscription = this.subscriptionRepository.create({
+        user,
+        pricing,
+        start_date: new Date(),
+        status: SubscriptionStatus.PENDING,
+        payment_status: PaymentStatus.PENDING,
+        amount_paid: pricing.price,
+        currency: pricing.currency,
+        is_trial: false,
+      });
+
+      const savedSubscription = await this.subscriptionRepository.save(subscription);
+
+      // Initialize payment
+      const paymentResult = await this.initiatePaidSubscription(savedSubscription);
+
+      return {
+        success: true,
+        message: 'Please complete your payment to activate your subscription',
+        subscription: savedSubscription,
+        paymentUrl: paymentResult.paymentUrl
+      };
+
+    } catch (error) {
+      if (error instanceof HttpException) {
+        throw error;
+      }
+      throw new HttpException(
+        'Failed to subscribe to plan',
+        HttpStatus.INTERNAL_SERVER_ERROR
+      );
+    }
+  }
+
+  async verifyAndActivateSubscription(reference: string) {
+    const subscription = await this.subscriptionRepository.findOne({
+      where: { paystack_reference: reference },
+      relations: ['user', 'pricing'],
+    });
+
+    if (!subscription) throw new CustomHttpException(SYS_MSG.SUB_NOT_FOUND, HttpStatus.NOT_FOUND);
+
+
+    const verification = await this.paystackService.verifyTransaction(reference);
+
+    if (verification.data.status === 'success') {
+      subscription.status = SubscriptionStatus.ACTIVE;
+      subscription.payment_status = PaymentStatus.SUCCESSFUL;
+      subscription.paystack_customer_code = verification.data.customer.customer_code;
+
+      // Calculate end date based on duration
+      subscription.end_date = this.calculateEndDate(subscription.start_date, subscription.pricing.duration);
+
+      await this.subscriptionRepository.save(subscription);
+
+      // Return only the fields you want
+      return {
+        success: true,
+        message: "Your payment was successful and your subscription is now active.",
+        subscription_status: subscription.status,
+        payment_status: subscription.payment_status,
+        plan_name: subscription.pricing.plan_name,
+        amount_paid: subscription.amount_paid,
+        currency: subscription.currency,
+        duration: subscription.pricing.duration
+      };
+    } else {
+      subscription.status = SubscriptionStatus.FAILED;
+      subscription.payment_status = PaymentStatus.FAILED;
+      await this.subscriptionRepository.save(subscription);
+
+      return {
+        success: false,
+        message: "Payment verification failed.",
+        subscription_status: subscription.status,
+        payment_status: subscription.payment_status,
+        plan_name: subscription.pricing.plan_name,
+        amount_paid: subscription.amount_paid,
+        currency: subscription.currency,
+        duration: subscription.pricing.duration
+      };
+    }
+  }
+
 
   async checkUserSubscriptionAfterLogin(userId: string): Promise<PostLoginSubscriptionResponse> {
     // Get user's current subscription most recent subscription
@@ -240,99 +377,6 @@ export class SubscriptionService {
     }
   }
 
-  async subscribeToPlan(userId: string, planData: SubscribeToPlanRequest): Promise<SubscriptionResponse> {
-    try {
-      const user = await this.userRepository.findOne({ where: { id: userId } });
-      if (!user) throw new CustomHttpException(SYS_MSG.USER_NOT_FOUND, HttpStatus.NOT_FOUND);
-
-      // Check if user already has an active subscription
-      const existingSubscription = await this.getUserActiveSubscription(userId);
-      if (existingSubscription) {
-        return {
-          success: true,
-          message: 'You already have an active subscription',
-          subscription: existingSubscription,
-          isTrial: existingSubscription.is_trial,
-        };
-      }
-
-      // Handle free trial plan
-      if (planData.plan_id === 'free-trial' || planData.price === 0) {
-        const freeTrialPricing = await this.pricingRepository.findOne({
-          where: { duration: '2 days', isActive: true }
-        });
-
-        if (!freeTrialPricing) throw new HttpException('Free trial plan not available', HttpStatus.BAD_REQUEST);
-
-        const subscription = this.subscriptionRepository.create({
-          user,
-          pricing: freeTrialPricing,
-          start_date: new Date(),
-          status: SubscriptionStatus.ACTIVE,
-          payment_status: PaymentStatus.NOT_REQUIRED,
-          amount_paid: 0,
-          currency: planData.currency,
-          is_trial: true,
-        });
-
-        // Set trial end date
-        const endDate = new Date();
-        endDate.setDate(endDate.getDate() + 2);
-        subscription.end_date = endDate;
-
-        const savedSubscription = await this.subscriptionRepository.save(subscription);
-
-        return {
-          success: true,
-          message: 'Free trial activated successfully!',
-          subscription: savedSubscription,
-          isTrial: true,
-          trialEndsAt: endDate,
-        };
-      }
-
-      // Handle paid plans
-      const pricing = await this.pricingRepository.findOne({
-        where: { id: planData.plan_id, isActive: true }
-      });
-      if (!pricing) throw new HttpException('Pricing plan not found', HttpStatus.NOT_FOUND);
-
-
-      // Create pending subscription
-      const subscription = this.subscriptionRepository.create({
-        user,
-        pricing,
-        start_date: new Date(),
-        status: SubscriptionStatus.PENDING,
-        payment_status: PaymentStatus.PENDING,
-        amount_paid: planData.price,
-        currency: planData.currency,
-        is_trial: false,
-      });
-
-      const savedSubscription = await this.subscriptionRepository.save(subscription);
-
-      // Initialize payment
-      const paymentResult = await this.initiatePaidSubscription(savedSubscription);
-
-      return {
-        success: true,
-        message: 'Please complete your payment to activate your subscription',
-        subscription: savedSubscription,
-        paymentUrl: paymentResult.paymentUrl,
-        isTrial: false,
-      };
-
-    } catch (error) {
-      if (error instanceof HttpException) {
-        throw error;
-      }
-      throw new HttpException(
-        'Failed to subscribe to plan',
-        HttpStatus.INTERNAL_SERVER_ERROR
-      );
-    }
-  }
 
 
   async storePendingSubscription(userId: string, pricingId: string) {
@@ -341,6 +385,7 @@ export class SubscriptionService {
 
     if (!user || !pricing) {
       throw new HttpException('User or pricing plan not found', HttpStatus.NOT_FOUND);
+
     }
 
     // Create pending subscription record
@@ -383,38 +428,6 @@ export class SubscriptionService {
   }
 
 
-  async verifyAndActivateSubscription(reference: string) {
-    const subscription = await this.subscriptionRepository.findOne({
-      where: { paystack_reference: reference },
-      relations: ['user', 'pricing'],
-    });
-
-    if (!subscription) {
-      throw new HttpException('Subscription not found', HttpStatus.NOT_FOUND);
-    }
-
-    const verification = await this.paystackService.verifyTransaction(reference);
-
-    if (verification.data.status === 'success') {
-      subscription.status = SubscriptionStatus.ACTIVE;
-      subscription.payment_status = PaymentStatus.SUCCESSFUL;
-      subscription.paystack_customer_code = verification.data.customer.customer_code;
-
-      // Calculate end date based on duration
-      const endDate = new Date(subscription.start_date);
-      this.calculateEndDate(endDate, subscription.pricing.duration);
-      subscription.end_date = endDate;
-
-      await this.subscriptionRepository.save(subscription);
-      return subscription;
-    } else {
-      subscription.status = SubscriptionStatus.FAILED;
-      subscription.payment_status = PaymentStatus.FAILED;
-      await this.subscriptionRepository.save(subscription);
-
-      throw new HttpException('Payment verification failed', HttpStatus.BAD_REQUEST);
-    }
-  }
 
 
   // Handle trial expiration and payment requirement
@@ -433,7 +446,10 @@ export class SubscriptionService {
     }
 
     const now = new Date();
-    const isExpired = subscription.end_date <= now;
+
+    // Ensure end_date is a proper Date object
+    const endDate = subscription.end_date instanceof Date ? subscription.end_date : new Date(subscription.end_date);
+    const isExpired = endDate <= now;
 
     if (isExpired) {
       // Convert trial to paid subscription requirement
@@ -448,7 +464,7 @@ export class SubscriptionService {
     }
 
     const hoursUntilExpiry = Math.ceil(
-      (subscription.end_date.getTime() - now.getTime()) / (1000 * 60 * 60)
+      (endDate.getTime() - now.getTime()) / (1000 * 60 * 60)
     );
 
     return {
@@ -495,7 +511,7 @@ export class SubscriptionService {
     });
 
     if (!subscription) {
-      throw new HttpException('Subscription not found', HttpStatus.NOT_FOUND);
+      if (!subscription) throw new CustomHttpException(SYS_MSG.SUB_NOT_FOUND, HttpStatus.NOT_FOUND);
     }
 
     subscription.status = SubscriptionStatus.CANCELLED;
@@ -529,8 +545,9 @@ export class SubscriptionService {
     }
 
     // Check if subscription is about to expire
+    const endDate = subscription.end_date instanceof Date ? subscription.end_date : new Date(subscription.end_date);
     const daysUntilExpiry = Math.ceil(
-      (subscription.end_date.getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24)
+      (endDate.getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24)
     );
 
     return {

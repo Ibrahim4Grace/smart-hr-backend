@@ -31,8 +31,10 @@ export const DUPLICATE_PRICING = 'pricing plan with this name and configuration 
 export const PRICING_NOT_FOUND = 'ricing plan not found';
 export const CANNOT_DELETE_ACTIVE_PLAN = 'Cannot delete a plan with active subscriptions';
 export const CANNOT_UPDATE_ACTIVE_PLAN = 'Cannot update price of a plan with active subscriptions';
+export const SUB_NOT_FOUND = 'Subscription not found';
+export const PRICE_NOT_FOUND = 'Pricing plan not found';
 
-export const WAIT_A_MIN ='Please wait at least 1 minute before requesting a new OTP';
+export const WAIT_A_MIN = 'Please wait at least 1 minute before requesting a new OTP';
 export const BAD_REQUEST = 'Bad Request';
 
 export const OK = 'Success';
@@ -55,6 +57,7 @@ export const PASSWORD_UPDATED = 'Password updated successfully';
 export const DUPLICATE_PASSWORD = 'New password cannot be the same as old password';
 export const REQUEST_SUCCESSFUL = 'Request completed successfully';
 export const INVALID_CURRENT_PWD = 'Current password is incorrect'
+export const NEW_PASSWORD_MISMATCH = 'New passwords do not match'
 export const INVALID_REFRESH_TOKEN = 'Invalid refresh token';
 export const ADMIN_ROLE_NOT_FOUND = 'Admin Role does not exist';
 // export const PAYMENT_NOTFOUND = 'Payment plan not found';

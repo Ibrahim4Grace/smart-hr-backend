@@ -2,13 +2,16 @@ import { Controller, Get, Post, Body, Patch, Param, Delete, Query, UseGuards, Re
 import { CalendarService } from './calendar.service';
 import { CreateCalendarDto } from './dto/create-calendar.dto';
 import { UpdateCalendarDto } from './dto/update-calendar.dto';
-import { ApiBearerAuth, ApiOperation, ApiResponse, ApiQuery, ApiTags } from '@nestjs/swagger';
-import { AuthGuard } from '@guards/auth.guard';
+import { ApiBearerAuth, ApiOperation, ApiResponse, ApiQuery, ApiTags, ApiBody } from '@nestjs/swagger';
 import { GetUser } from '@shared/decorators/user.decorator';
-import { UserPayload } from '@modules/user/interface/user.interface';
+import { Roles } from '@shared/decorators/roles.decorator';
+import { RolesGuard } from '@guards/roles.guard';
+import { UserRole } from '@modules/auth/interfaces/auth.interface';
 
 @ApiTags('Calendar')
 @ApiBearerAuth()
+@UseGuards(RolesGuard)
+@Roles(UserRole.HR)
 @Controller('calendar')
 
 export class CalendarController {
@@ -16,6 +19,7 @@ export class CalendarController {
 
   @Post()
   @ApiOperation({ summary: 'Create a new calendar event' })
+  @ApiBody({ type: CreateCalendarDto })
   @ApiResponse({ status: 201, description: 'The event has been successfully created.' })
   @ApiResponse({ status: 400, description: 'Bad Request.' })
   @ApiResponse({ status: 401, description: 'Unauthorized.' })
@@ -35,8 +39,10 @@ export class CalendarController {
     @GetUser('userId') userId: string,
     @Query('startTime') startTime?: Date,
     @Query('endTime') endTime?: Date,
+    @Query('page') page: number = 1,
+    @Query('limit') limit: number = 10,
   ) {
-    return this.calendarService.findAll(userId, startTime, endTime);
+    return this.calendarService.findAll(userId, startTime, endTime, page, limit);
   }
 
   @Get('upcoming')
@@ -46,7 +52,7 @@ export class CalendarController {
   @ApiQuery({ name: 'limit', required: false, type: Number })
   findUpcoming(
     @GetUser('userId') userId: string,
-    @Query('limit') limit?: number,
+    @Query('limit') limit: number = 10,
   ) {
     return this.calendarService.findUpcoming(userId, limit);
   }
@@ -65,6 +71,7 @@ export class CalendarController {
 
   @Patch(':calendarId')
   @ApiOperation({ summary: 'Update a calendar event' })
+  @ApiBody({ type: UpdateCalendarDto })
   @ApiResponse({ status: 200, description: 'The event has been successfully updated.' })
   @ApiResponse({ status: 400, description: 'Bad Request.' })
   @ApiResponse({ status: 401, description: 'Unauthorized.' })

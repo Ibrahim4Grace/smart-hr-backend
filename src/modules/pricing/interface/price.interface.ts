@@ -9,6 +9,7 @@ export enum AccessType {
 }
 
 export enum Duration {
+    TRIAL = '2 days',
     MONTHLY = 'MONTHLY',
     YEARLY = 'YEARLY'
 }

@@ -26,7 +26,7 @@ export class SubscriptionController {
   constructor(private readonly subscriptionService: SubscriptionService) { }
 
 
-  @Get('post-login-status')
+  @Get('login-status')
   @ApiOperation({ description: 'Checks subscription status and provides action for user after login' })
   @ApiResponse({
     status: 200, description: 'Post-login subscription status retrieved.',
@@ -165,26 +165,23 @@ export class SubscriptionController {
   }
 
 
-  // // Handle payment callback from Paystack
-  // @Get('callback')
-  // @skipAuth()
-  // @ApiOperation({
-  //   summary: 'Handle payment callback from Paystack',
-  //   description: 'Verifies payment and activates subscription when payment is successful'
-  // })
-  // @ApiResponse({
-  //   status: 200,
-  //   description: 'Payment callback handled and subscription activated.',
-  //   type: SubscriptionResponseDto
-  // })
-  // @ApiResponse({ status: 400, description: 'Invalid or expired reference.' })
-  // async handlePaymentCallback(@Query('reference') reference: string) {
-  //   return await this.subscriptionService.verifyAndActivateSubscription(reference);
-  // }
+
+  @Get('callback')
+  @skipAuth()
+  @ApiOperation({ description: 'Verifies payment and activates subscription when payment is successful' })
+  @ApiResponse({
+    status: 200, description: 'Payment callback handled and subscription activated.',
+    type: SubscriptionResponseDto
+  })
+  @ApiResponse({ status: 400, description: 'Invalid or expired reference.' })
+  async handlePaymentCallback(@Query('reference') reference: string) {
+    return await this.subscriptionService.verifyAndActivateSubscription(reference);
+  }
 
   // Verify payment status
   @Post('verify-payment/:reference')
-  @ApiOperation({ description: 'Manually verify a payment reference and activate subscription if successful' })
+  @Roles(UserRole.ADMIN, UserRole.SUPER_ADMIN)
+  @ApiOperation({ description: 'Admin Manually verify a payment reference and activate subscription if successful' })
   @ApiResponse({
     status: 200, description: 'Payment verified and subscription activated.',
     type: SubscriptionResponseDto

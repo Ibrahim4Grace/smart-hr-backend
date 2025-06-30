@@ -11,17 +11,17 @@ export class CreateCalendarDto {
     @ApiProperty({ description: 'Event date' })
     @IsDate()
     @Type(() => Date)
-    eventDate: Date;
+    event_date: Date;
 
     @ApiProperty({ description: 'Start date and time of the event' })
     @IsDate()
     @Type(() => Date)
-    startTime: Date;
+    start_time: Date;
 
     @ApiProperty({ description: 'End date and time of the event' })
     @IsDate()
     @Type(() => Date)
-    endTime: Date;
+    end_time: Date;
 
     @ApiPropertyOptional({ description: 'Location of the event' })
     @IsString()

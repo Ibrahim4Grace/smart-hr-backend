@@ -1,5 +1,5 @@
 import { InjectRepository } from '@nestjs/typeorm';
-import { HttpStatus, Injectable, BadRequestException } from '@nestjs/common';
+import { HttpStatus, Injectable, BadRequestException, HttpException } from '@nestjs/common';
 import { EntityManager, Repository } from 'typeorm';
 import { PasswordService } from '../auth/password.service';
 import { User } from './entities/user.entity';
@@ -47,6 +47,7 @@ export class UserService {
     private cachePrefixes: CachePrefixesService,
     private readonly permissionsService: EntityPermissionsService,
     private emailQueueService: EmailQueueService,
+
 
   ) {
     this.uploadsDir = PROFILE_PHOTO_UPLOADS;
@@ -229,9 +230,31 @@ export class UserService {
     }
 
     try {
+
+      if (updateUserDto.new_password) {
+        if (!updateUserDto.current_password) {
+          throw new CustomHttpException('Current password is required', HttpStatus.BAD_REQUEST);
+        }
+        // Compare current password
+        const isMatch = await this.passwordService.comparePassword(updateUserDto.current_password, user.password);
+        if (!isMatch) {
+          throw new CustomHttpException(SYS_MSG.INVALID_CURRENT_PWD, HttpStatus.BAD_REQUEST);
+        }
+        if (updateUserDto.new_password !== updateUserDto.confirm_password) {
+          throw new CustomHttpException(SYS_MSG.NEW_PASSWORD_MISMATCH, HttpStatus.BAD_REQUEST);
+        }
+        if (updateUserDto.new_password === updateUserDto.current_password) {
+          throw new CustomHttpException(SYS_MSG.DUPLICATE_PASSWORD, HttpStatus.BAD_REQUEST);
+        }
+
+        user.password = await this.passwordService.hashPassword(updateUserDto.new_password);
+
+      }
+
       // Use Object.assign to update the existing entity
-      Object.assign(user, updateUserDto);
-      const savedUser = await this.userRepository.save(user);
+      const { current_password, new_password, confirm_password, ...rest } = updateUserDto;
+      Object.assign(user, rest);
+      await this.userRepository.save(user);
 
       await Promise.all([
         this.cacheService.delete(this.cachePrefixes.USER_BY_ID, userId),
@@ -240,17 +263,15 @@ export class UserService {
 
       return {
         status: 'success',
-        message: 'User Updated Successfully',
-        user: {
-          id: savedUser.id,
-          name: savedUser.name,
-          phone: savedUser.phone,
-        }
+        message: 'Hr profile successfully updated',
       };
     } catch (error) {
+      if (error instanceof HttpException) {
+        throw error;
+      }
       throw new BadRequestException({
         error: 'Bad Request',
-        message: 'Failed to update user',
+        message: 'Failed to update hr profile',
         status_code: HttpStatus.BAD_REQUEST,
       });
     }

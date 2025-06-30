@@ -18,16 +18,12 @@ export enum PaymentStatus {
     NOT_REQUIRED = 'NOT_REQUIRED',
 }
 
-// Request interfaces
+
 export interface SubscribeToPlanRequest {
     plan_id: string;
-    plan_name: string;
-    price: number;
-    currency: string;
-    duration: string;
 }
 
-// Response interfaces
+
 export interface SubscriptionResponse {
     success: boolean;
     message: string;

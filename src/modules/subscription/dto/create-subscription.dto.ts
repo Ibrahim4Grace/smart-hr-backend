@@ -12,22 +12,6 @@ export class SubscribeToPlanRequestDto {
     @ApiProperty({ description: 'ID of the pricing plan' })
     @IsString()
     plan_id: string;
-
-    @ApiProperty({ description: 'Name of the pricing plan' })
-    @IsString()
-    plan_name: string;
-
-    @ApiProperty({ description: 'Price of the plan' })
-    @IsNumber()
-    price: number;
-
-    @ApiProperty({ description: 'Currency code (NGN, USD)' })
-    @IsString()
-    currency: string;
-
-    @ApiProperty({ description: 'Duration (monthly, yearly)' })
-    @IsString()
-    duration: string;
 }
 
 export class SubscriptionResponseDto {

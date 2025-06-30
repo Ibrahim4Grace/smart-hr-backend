@@ -8,10 +8,10 @@ import { SubscriptionStatus, PaymentStatus } from '../interface/subscription.int
 @Entity('subscriptions')
 export class Subscription extends AbstractBaseEntity {
 
-  @Column({ type: 'date' })
+  @Column({ type: 'timestamp', default: () => 'CURRENT_TIMESTAMP' })
   start_date: Date;
 
-  @Column({ type: 'date', nullable: true })
+  @Column({ type: 'timestamp', nullable: true })
   end_date: Date;
 
   @Column({

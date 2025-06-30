@@ -23,17 +23,17 @@ import { CreateEmployeeDto } from '@modules/employee/dto/create-employee.dto';
 import { ChangePasswordDto } from '@modules/employee/dto/change-password.dto';
 
 
-@ApiTags('hrs')
+@ApiTags('hr')
 @ApiBearerAuth()
 @UseGuards(RolesGuard)
 @Roles(UserRole.HR)
-@Controller('hrs')
+@Controller('hr')
 export class UserController {
   constructor(private readonly userService: UserService) { }
 
   @Post('employee')
-  @HttpCode(201)
   @ApiOperation({ summary: 'Create a new employee' })
+  @ApiBody({ type: CreateEmployeeDto })
   @ApiResponse({ status: 201, description: 'The employee has been successfully created.' })
   @ApiResponse({ status: 401, description: 'Unauthorized' })
   @ApiResponse({ status: 403, description: 'Forbidden' })
@@ -60,7 +60,7 @@ export class UserController {
     return this.userService.findEmployeesByHR(hrId, paginationOptions);
   }
 
-  @Get()
+  @Get('profile')
   @ApiOperation({ summary: 'Get HR information' })
   @ApiResponse({ status: 200, description: 'HR information retrieved successfully' })
   @ApiResponse({ status: 401, description: 'Unauthorized' })
@@ -71,8 +71,21 @@ export class UserController {
     return this.userService.getHRInfo(hrId);
   }
 
+
+  @Patch('profile')
+  @Roles(UserRole.HR, UserRole.ADMIN, UserRole.SUPER_ADMIN)
+  @ApiOperation({ summary: 'Update own HR profile' })
+  @ApiBody({ type: UpdateUserDto })
+  @ApiResponse({ status: 200, description: 'Profile updated successfully' })
+  async updateOwnProfile(
+    @GetUser('userId') userId: string,
+    @Body() updatedUserDto: UpdateUserDto,
+  ) {
+    return this.userService.update(userId, updatedUserDto, userId);
+  }
+
   @Post('change-password')
-  @HttpCode(200)
+  @ApiBody({ type: ChangePasswordDto })
   @ApiOperation({ summary: 'Change user password' })
   @ApiResponse({ status: 200, description: 'Password changed successfully' })
   @ApiResponse({ status: 400, description: 'Invalid password or passwords do not match' })
@@ -112,20 +125,6 @@ export class UserController {
     return this.userService.remove(employeeId, userId);
   }
 
-  @Patch(':userId')
-  @ApiOperation({ summary: 'Update HR' })
-  @ApiResponse({
-    status: 200,
-    description: 'HR updated successfully',
-    type: UpdateUserDto,
-  })
-  async updateHR(
-    @GetUser('userId') currentUserId: string,
-    @Param('userId') userId: string,
-    @Body() updatedUserDto: UpdateUserDto,
-  ) {
-    return this.userService.update(userId, updatedUserDto, currentUserId);
-  }
 
 
   @Post(':employeeId/deactivate')

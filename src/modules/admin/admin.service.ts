@@ -136,46 +136,7 @@ export class AdminService {
         );
     }
 
-    async update(
-        userId: string,
-        updateUserDto: UpdateUserDto,
-        currentUserId: string
-    ): Promise<UpdateUserResponseDTO> {
-        if (!userId) throw new CustomHttpException(SYS_MSG.USER_NOT_FOUND, HttpStatus.NOT_FOUND);
 
-        const user = await this.permissionsService.getUserById(userId);
-
-        if (user.id !== currentUserId) {
-            throw new CustomHttpException(SYS_MSG.FORBIDDEN_ACTION, HttpStatus.FORBIDDEN);
-        }
-
-        try {
-            // Use Object.assign to update the existing entity
-            Object.assign(user, updateUserDto);
-            const savedUser = await this.userRepository.save(user);
-
-            await Promise.all([
-                this.cacheService.delete(this.cachePrefixes.USER_BY_ID, userId),
-                this.cacheService.deleteByPrefix(this.cachePrefixes.USER)
-            ]);
-
-            return {
-                status: 'success',
-                message: 'User Updated Successfully',
-                user: {
-                    id: savedUser.id,
-                    name: savedUser.name,
-                    phone: savedUser.phone,
-                }
-            };
-        } catch (error) {
-            throw new BadRequestException({
-                error: 'Bad Request',
-                message: 'Failed to update user',
-                status_code: HttpStatus.BAD_REQUEST,
-            });
-        }
-    }
 
     async uploadProfilePicture(
         userId: string,
