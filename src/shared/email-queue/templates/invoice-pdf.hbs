@@ -1,0 +1,379 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Invoice: {{invoiceNumber}}</title>
+  
+  <!-- CDN Assets -->
+  <link rel="stylesheet" href="https://smart-hr-assets.pages.dev/css/bootstrap.min.css">
+  <link rel="stylesheet" href="https://smart-hr-assets.pages.dev/css/style.css">
+  <link rel="stylesheet" href="https://smart-hr-assets.pages.dev/plugins/fontawesome/css/all.min.css">
+    <style>
+    body {
+      background: #f8f9fa;
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      color: #495057;
+      line-height: 1.6;
+      margin: 0;
+      padding: 10px;
+    }
+    .invoice-container {
+      background: #fff;
+      max-width: 1100px;
+      margin: 0 auto;
+      padding: 20px;
+      border-radius: 0;
+      box-shadow: 0 0 10px rgba(0,0,0,0.1);
+      font-size: 14px;
+    }
+    .invoice-header {
+      padding: 15px 0;
+      border-bottom: 1px solid #e9ecef;
+    }
+    .invoice-header .row {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+    .company-info {
+      text-align: center;
+    }
+    .company-logo {
+      max-width: 80px;
+      height: auto;
+      margin-bottom: 10px;
+    }
+    .company-address {
+      color: #6c757d;
+      font-size: 14px;
+      margin-bottom: 10px;
+    }
+    .invoice-info {
+      text-align: center;
+    }
+    .invoice-number {
+      font-size: 16px;
+      font-weight: 600;
+      color: #333;
+      margin-bottom: 5px;
+    }
+    .invoice-number .number {
+      color: #ff6600;
+      font-weight: 700;
+    }
+    .date-info {
+      color: #6c757d;
+      font-size: 14px;
+      margin-bottom: 5px;
+    }
+    .date-info span {
+      color: #333;
+      font-weight: 500;
+    }
+    .billing-section {
+      padding: 15px 0;
+      border-bottom: 1px solid #e9ecef;
+    }
+    .billing-section .row {
+      display: flex;
+      flex-direction: column;
+      gap: 15px;
+    }
+    .billing-column {
+      min-width: 0;
+    }
+    .billing-title {
+      font-size: 16px;
+      font-weight: 600;
+      color: #333;
+      margin-bottom: 10px;
+      border-bottom: 1px solid #e9ecef;
+      padding-bottom: 5px;
+    }
+    .contact-name {
+      font-size: 16px;
+      font-weight: 600;
+      color: #333;
+      margin-bottom: 5px;
+    }
+    .contact-detail {
+      color: #6c757d;
+      font-size: 14px;
+      margin-bottom: 5px;
+    }
+    .contact-detail span {
+      color: #333;
+    }
+    .invoice-purpose {
+      padding: 12px 0px;
+      background: #f8f9fa;
+      border-bottom: 1px solid #e9ecef;
+    }
+    .purpose-label {
+      font-size: 14px;
+      color: #6b7280;
+      margin-bottom: 5px;
+      font-family: Roboto, sans-serif;
+    }
+    .purpose-title {
+      font-size: 14px;
+       font-family: Roboto, sans-serif;
+      font-weight: 500;
+      color: #212529;
+      margin: 0;
+    }
+    .table-section {
+      padding: 0 0 15px;
+    }
+    .items-table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-bottom: 0;
+    }
+    .items-table th {
+      background: #f1f3f4;
+      padding: 10px;
+      font-size: 14px;
+      font-weight: 600;
+      color: #333;
+      border: 1px solid #dee2e6;
+      text-align: left;
+    }
+    .items-table th:last-child,
+    .items-table th:nth-last-child(2),
+    .items-table th:nth-last-child(3),
+    .items-table th:nth-last-child(4) {
+      text-align: right;
+    }
+    .items-table td {
+      padding: 10px;
+      border: 1px solid #dee2e6;
+      color: #333;
+      font-size: 14px;
+    }
+    .items-table td:last-child,
+    .items-table td:nth-last-child(2),
+    .items-table td:nth-last-child(3),
+    .items-table td:nth-last-child(4) {
+      text-align: right;
+    }
+    .items-table tbody tr:nth-child(even) {
+      background-color: #f8f9fa;
+    }
+    .totals-section {
+      padding: 15px 0;
+      background: #f8f9fa;
+    }
+    .totals-container {
+      width: 100%;
+    }
+    .totals-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 5px 0;
+      font-size: 14px;
+      border-bottom: 1px solid #e9ecef;
+    }
+    .totals-label {
+      color: #212529;
+      font-weight: 500;
+      font-family: Roboto, sans-serif;
+      padding: 0px 2px;
+    }
+    .totals-value {
+      color: #333;
+      font-weight: 600;
+      min-width: 80px;
+      text-align: right;
+    }
+    .total-final {
+      border-top: 2px solid #333;
+      margin-top: 10px;
+      padding-top: 10px;
+    }
+    .total-final .totals-label,
+    .total-final .totals-value {
+      font-size: 14px;
+      font-weight: 500;
+    }
+    .amount-words {
+      font-size: 13px;
+      color: #6c757d;
+      margin-top: 10px;
+      font-style: italic;
+    }
+    .signature-section {
+      padding: 15px 0;
+      text-align: right;
+      border-top: 1px solid #e9ecef;
+    }
+    .signature-block {
+      display: inline-block;
+      text-align: center;
+      max-width: 200px;
+    }
+    .signature-image {
+      max-width: 120px;
+      height: auto;
+      margin-bottom: 10px;
+    }
+    .signature-name {
+      font-weight: 600;
+      color: #333;
+      font-size: 14px;
+      margin-bottom: 5px;
+    }
+    .signature-title {
+      color: #6c757d;
+      font-size: 13px;
+      margin: 0;
+    }
+    @media (max-width: 768px) {
+      .invoice-container {
+        padding: 10px;
+      }
+      .invoice-header .row,
+      .billing-section .row {
+        flex-direction: column;
+        gap: 10px;
+      }
+      .invoice-info {
+        text-align: left;
+      }
+      .items-table th,
+      .items-table td {
+        padding: 8px;
+        font-size: 12px;
+      }
+      .totals-row {
+        flex-direction: column;
+        text-align: right;
+      }
+      .totals-value {
+        margin-top: 5px;
+      }
+    }
+    @media print {
+      body {
+        background: #fff;
+        padding: 0;
+      }
+      .invoice-container {
+        box-shadow: none;
+        margin: 0;
+        padding: 20px;
+      }
+      .totals-row {
+        flex-direction: row;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="invoice-container">
+    <!-- Invoice Header -->
+    <div class="invoice-header">
+      <div class="row">
+        <div class="company-info">
+          <img src="{{companyLogo}}" class="company-logo" alt="Company Logo">
+        </div>
+        <div class="invoice-info">
+          <div class="invoice-number">Invoice No <span class="number">#{{invoiceNumber}}</span></div>
+          <div class="date-info">Created Date : <span>{{createdDate}}</span></div>
+          <div class="date-info">Due Date : <span>{{dueDate}}</span></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Billing Information -->
+    <div class="billing-section">
+      <div class="row">
+        <div class="billing-column">
+          <div class="billing-title">From</div>
+          <div class="contact-name">{{fromName}}</div>
+          <div class="contact-detail">{{fromAddress}}</div>
+          <div class="contact-detail">Email : <span>{{fromEmail}}</span></div>
+          <div class="contact-detail">Phone : <span>{{fromPhone}}</span></div>
+        </div>
+        <div class="billing-column">
+          <div class="billing-title">To</div>
+          <div class="contact-name">{{toName}}</div>
+          <div class="contact-detail">{{toAddress}}</div>
+          <div class="contact-detail">Email : <span>{{toEmail}}</span></div>
+          <div class="contact-detail">Phone : <span>{{toPhone}}</span></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Invoice Purpose -->
+    <div class="invoice-purpose">
+      <span class="purpose-label">Invoice For :</span>
+      <span class="purpose-title">{{invoiceTitle}}</span>
+    </div>
+
+    <!-- Items Table -->
+    <div class="table-section">
+      <table class="items-table">
+        <thead>
+          <tr>
+            <th>Job Description</th>
+            <th>Qty</th>
+            <th>Cost</th>
+            <th>Discount</th>
+            <th>Total</th>
+          </tr>
+        </thead>
+        <tbody>
+          {{#each items}}
+          <tr>
+            <td>{{description}}</td>
+            <td>{{quantity}}</td>
+            <td>${{rate}}</td>
+            <td>${{discount}}</td>
+            <td>${{total}}</td>
+          </tr>
+          {{/each}}
+        </tbody>
+      </table>
+    </div>
+
+    <!-- Totals Section -->
+    <div class="totals-section">
+      <div class="totals-container">
+        <div class="totals-row">
+          <span class="totals-label">Sub Total</span>
+          <span class="totals-value">${{subTotal}}</span>
+        </div>
+        <div class="totals-row">
+          <span class="totals-label">Discount ({{discountPercentage}}%)</span>
+          <span class="totals-value">${{totalDiscount}}</span>
+        </div>
+        <div class="totals-row">
+          <span class="totals-label">VAT ({{vatPercentage}}%)</span>
+          <span class="totals-value">${{vatAmount}}</span>
+        </div>
+        <div class="totals-row total-final">
+          <span class="totals-label">Total Amount</span>
+          <span class="totals-value">${{totalAmount}}</span>
+        </div>
+        <div class="amount-words">
+          <strong>Amount in Words:</strong> {{amountInWords}}
+        </div>
+      </div>
+    </div>
+
+    <!-- Signature Section -->
+    <div class="signature-section">
+      <div class="signature-block">
+        <div class="signature-name">{{signatureName}}</div>
+        <div class="signature-title">{{signatureTitle}}</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Bootstrap JS -->
+  <script src="https://smart-hr-assets.pages.dev/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>

@@ -1,0 +1,58 @@
+<html lang='en'>
+  <head>
+    <meta charset='UTF-8' />
+    <meta name='viewport' content='width=device-width, initial-scale=1.0' />
+    <title>Password Reset Request</title>
+    <style>
+      .template-main {
+        font-family: Arial, sans-serif;
+        max-width: 600px;
+        margin: 0 auto;
+        padding: 20px;
+      }
+      .content {
+        background-color: #f9f9f9;
+        padding: 20px;
+        border-radius: 8px;
+      }
+      .template-receiver-name {
+        font-size: 18px;
+        margin: 0 0 10px;
+      }
+      .template-message {
+        font-size: 16px;
+        margin: 0 0 20px;
+      }
+      .editable-content {
+        margin: 20px 0;
+      }
+      .editable-content p {
+        margin: 10px 0;
+      }
+      .template-farewell {
+        margin-top: 20px;
+      }
+    </style>
+  </head>
+  <body>
+    <div class='template-main'>
+      <div class='content'>
+        <h2>Account Deactivation Notice</h2>
+        <p class='template-receiver-name'>Dear {{name}},</p>
+        <p>Your account has been deactivated by our administration team.</p>
+
+        <p>Deactivated by:
+          {{admin}}<br />
+          Date:
+          {{timestamp}}</p>
+
+        <p>If you believe this was done in error, please contact support.</p>
+
+        <div class='template-farewell'>
+          <p>Best regards,<br />
+            The Smart-Hr Team</p>
+        </div>
+      </div>
+    </div>
+  </body>
+</html>

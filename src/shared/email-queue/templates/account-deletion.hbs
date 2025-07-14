@@ -1,0 +1,73 @@
+<html lang='en'>
+  <head>
+    <meta charset='UTF-8' />
+    <meta name='viewport' content='width=device-width, initial-scale=1.0' />
+    <title>Account Deletion Notification</title>
+    <style>
+      .template-main {
+        font-family: Arial, sans-serif;
+        max-width: 600px;
+        margin: 0 auto;
+        padding: 20px;
+        color: #333;
+        line-height: 1.6;
+      }
+      .content {
+        background-color: #f9f9f9;
+        padding: 20px;
+        border-radius: 8px;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+      }
+      .template-receiver-name {
+        font-size: 18px;
+        margin: 0 0 10px;
+        color: #2c3e50;
+      }
+      .template-message {
+        font-size: 16px;
+        margin: 0 0 20px;
+      }
+      .editable-content {
+        margin: 20px 0;
+      }
+      .editable-content p {
+        margin: 10px 0;
+      }
+      .template-farewell {
+        margin-top: 20px;
+        border-top: 1px solid #eee;
+        padding-top: 20px;
+      }
+      .deletion-info {
+        background-color: #fff;
+        padding: 15px;
+        border-radius: 4px;
+        margin: 15px 0;
+        border-left: 4px solid #e74c3c;
+      }
+    </style>
+  </head>
+  <body>
+    <div class='template-main'>
+      <div class='content'>
+        <h2>Account Deletion Notification</h2>
+        <p class='template-receiver-name'>Dear {{name}},</p>
+        <p>This email is to inform you that your account has been deleted from our system.</p>
+
+        <div class='deletion-info'>
+          <p><strong>Deleted by:</strong> {{admin}}<br />
+          <strong>Date:</strong> {{timestamp}}</p>
+        </div>
+
+        <p>If you believe this was done in error or have any questions, please contact our support team immediately.</p>
+        
+        <p>Thank you for your understanding.</p>
+
+        <div class='template-farewell'>
+          <p>Best regards,<br />
+            The Smart-Hr Team</p>
+        </div>
+      </div>
+    </div>
+  </body>
+</html>
