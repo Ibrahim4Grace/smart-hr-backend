@@ -1,5 +1,5 @@
 
-import { IsOptional, IsIn, IsInt, IsString } from 'class-validator';
+import { IsOptional, IsIn, IsInt, IsString, IsNumber } from 'class-validator';
 import { Type } from 'class-transformer';
 
 export class InvoiceFilterDto {
@@ -14,6 +14,16 @@ export class InvoiceFilterDto {
     @IsOptional()
     @IsString()
     dueDate?: string;
+
+    @IsOptional()
+    @Type(() => Number)
+    @IsNumber()
+    minAmount?: number;
+
+    @IsOptional()
+    @Type(() => Number)
+    @IsNumber()
+    maxAmount?: number;
 
     @IsOptional()
     @IsString()

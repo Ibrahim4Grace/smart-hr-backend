@@ -67,7 +67,6 @@ export class InvoiceProcessor {
                     amountInWords: invoiceData.amountInWords,
                     companyLogo: invoiceData.companyLogo,
                     signatureName: invoiceData.signatureName,
-                    signatureTitle: invoiceData.signatureTitle
                 },
                 pdfBuffer
             );
@@ -90,7 +89,6 @@ export class InvoiceProcessor {
         }
     }
 
-    // Handle failed jobs
     @Process('process-invoice-failed')
     async handleFailedInvoice(job: Job<InvoiceProcessingData>) {
         const { invoiceData, customerEmail, customerName, invoiceId } = job.data;

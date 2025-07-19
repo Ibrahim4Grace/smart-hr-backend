@@ -8,6 +8,8 @@ export interface InvoiceFilterOptions {
     status?: string;
     createdDate?: string;
     dueDate?: string;
+    minAmount?: number;
+    maxAmount?: number;
 }
 
 export interface InvoiceProcessingData {
