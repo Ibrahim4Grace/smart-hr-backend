@@ -16,6 +16,7 @@ import { InvoiceData } from '../../shared/interfaces/pdf.interface';
 import { InjectQueue } from '@nestjs/bull';
 import { Queue } from 'bull';
 import { InvoiceStatus } from './entities/invoice.entity';
+import { SequentialIdService } from '../../shared/services/sequential-id.service';
 
 @Injectable()
 export class InvoiceService extends BaseCacheableService {
@@ -29,24 +30,10 @@ export class InvoiceService extends BaseCacheableService {
     private readonly permissionsService: EntityPermissionsService,
     private readonly paginationService: PaginationService,
     @InjectQueue('invoice-processing') private readonly invoiceQueue: Queue,
+    private readonly sequentialIdService: SequentialIdService,
     cacheService: CacheService,
     cachePrefixes: CachePrefixesService,
   ) { super(cacheService, cachePrefixes); }
-
-  // Extract the numeric part and increment and Pad with zeros to 4 digits
-  private async generateInvoiceNumber(): Promise<string> {
-    const latestInvoice = await this.invoiceRepository
-      .createQueryBuilder('invoice')
-      .orderBy('CAST(SUBSTRING(invoice.invoice_number, 5) AS INTEGER)', 'DESC')
-      .getOne();
-
-    let nextNumber = 1;
-    if (latestInvoice && latestInvoice.invoice_number) {
-      const match = latestInvoice.invoice_number.match(/INV-(\d+)/);
-      if (match) nextNumber = parseInt(match[1], 10) + 1;
-    }
-    return `INV-${nextNumber.toString().padStart(4, '0')}`;
-  }
 
   //  format address
   private formatAddress(user: any): string {
@@ -128,7 +115,7 @@ export class InvoiceService extends BaseCacheableService {
     ]);
 
     if (!customer) throw new NotFoundException('Customer not found');
-    const invoice_number = await this.generateInvoiceNumber();
+    const invoice_number = await this.sequentialIdService.generateInvoiceId(this.invoiceRepository);
 
     // Calculate invoice totals BEFORE creating the invoice entity
     const items = createInvoiceDto.items || [];
