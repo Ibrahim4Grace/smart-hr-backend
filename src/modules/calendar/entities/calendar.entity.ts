@@ -1,15 +1,14 @@
 import { Entity, Column, ManyToOne, JoinColumn, Index } from 'typeorm';
-import { User } from '@modules/user/entities/user.entity';
+import { User } from '../../user/entities/user.entity';
 import { AbstractBaseEntity } from '../../../entities/base.entity';
 
 @Entity('calendar_events')
 export class Calendar extends AbstractBaseEntity {
 
-    @Column({ type: 'varchar', length: 255 })
+    @Column({ type: 'text' })
     title: string;
 
-    @Index()
-    @Column({ type: 'timestamp' })
+    @Column({ type: 'date' })
     event_date: Date;
 
     @Column({ type: 'timestamp' })
@@ -18,7 +17,7 @@ export class Calendar extends AbstractBaseEntity {
     @Column({ type: 'timestamp' })
     end_time: Date;
 
-    @Column({ type: 'varchar', length: 100, nullable: true })
+    @Column({ type: 'text' })
     location: string;
 
     @Column({ type: 'text', nullable: true })

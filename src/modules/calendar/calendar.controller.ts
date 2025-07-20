@@ -1,17 +1,17 @@
-import { Controller, Get, Post, Body, Patch, Param, Delete, Query, UseGuards, Request } from '@nestjs/common';
+import { Controller, Get, Post, Body, Patch, Param, Delete, Query, UseGuards } from '@nestjs/common';
 import { CalendarService } from './calendar.service';
 import { CreateCalendarDto } from './dto/create-calendar.dto';
 import { UpdateCalendarDto } from './dto/update-calendar.dto';
 import { ApiBearerAuth, ApiOperation, ApiResponse, ApiQuery, ApiTags, ApiBody } from '@nestjs/swagger';
-import { GetUser } from '@shared/decorators/user.decorator';
-import { Roles } from '@shared/decorators/roles.decorator';
-import { RolesGuard } from '@guards/roles.guard';
-import { UserRole } from '@modules/auth/interfaces/auth.interface';
+import { GetUser } from '../../shared/decorators/user.decorator';
+import { Roles } from '../../shared/decorators/roles.decorator';
+import { RolesGuard } from '../../guards/roles.guard';
+import { UserRole } from '../auth/interfaces/auth.interface';
 
 @ApiTags('Calendar')
 @ApiBearerAuth()
 @UseGuards(RolesGuard)
-@Roles(UserRole.HR)
+@Roles(UserRole.HR, UserRole.EMPLOYEE)
 @Controller('calendar')
 
 export class CalendarController {
@@ -93,4 +93,6 @@ export class CalendarController {
     @GetUser('userId') userId: string) {
     return this.calendarService.remove(calendarId, userId);
   }
+
+
 }
