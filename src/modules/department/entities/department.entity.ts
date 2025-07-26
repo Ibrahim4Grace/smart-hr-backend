@@ -1,15 +1,23 @@
-import { Entity, Column, OneToMany, JoinColumn, Index, ManyToOne } from 'typeorm';
+import { Entity, Column, JoinColumn, Index, ManyToOne, OneToMany } from 'typeorm';
 import { AbstractBaseEntity } from '../../../entities/base.entity';
 import { User } from '@modules/user/entities/user.entity';
-import { Designation } from '@modules/designation/entities/designation.entity';
+import { Employee } from '@modules/employee/entities/employee.entity';
+
+export enum DepartmentStatus {
+    ACTIVE = 'Active',
+    INACTIVE = 'Inactive',
+}
 
 @Entity('departments')
 export class Department extends AbstractBaseEntity {
     @Column({ type: 'text' })
     name: string;
 
-    @OneToMany(() => Designation, (designation) => designation.department)
-    designations: Designation[];
+    @Column({ type: 'text', default: DepartmentStatus.ACTIVE })
+    status: string;
+
+    @OneToMany(() => Employee, (employee) => employee.department)
+    employees: Employee[];
 
     //relationship to track which HR added this department
     @Index()

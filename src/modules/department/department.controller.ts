@@ -2,13 +2,14 @@ import { Controller, Get, Post, Body, Patch, Param, Delete, UseGuards, Query } f
 import { DepartmentService } from './department.service';
 import { CreateDepartmentDto } from './dto/create-department.dto';
 import { UpdateDepartmentDto } from './dto/update-department.dto';
-import { ApiBearerAuth, ApiBody, ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
+import { ApiBearerAuth, ApiBody, ApiOperation, ApiResponse, ApiTags, ApiQuery } from '@nestjs/swagger';
 import { UserRole } from '../auth/interfaces/auth.interface';
 import { GetUser } from '../../shared/decorators/user.decorator';
 import { Roles } from '@shared/decorators/roles.decorator';
 import { RolesGuard } from '@guards/roles.guard';
 import { PaginationOptions } from '@shared/interfaces/pagination.interface';
 import { Department } from './entities/department.entity';
+import { DepartmentFilterDto, DepartmentListResponseDto } from './dto/department-list.dto';
 
 @ApiTags('department')
 @ApiBearerAuth()
@@ -38,8 +39,26 @@ export class DepartmentController {
   @ApiResponse({ status: 401, description: 'Unauthorized' })
   findAll(
     @Query() paginationOptions: PaginationOptions<Department>,
-    @GetUser('userId') userId: string,) {
+    @GetUser('userId') userId: string,
+  ) {
     return this.departmentService.findAll(paginationOptions, userId);
+  }
+
+  @Get('filter')
+  @ApiOperation({ summary: 'Get all departments with employee counts and filtering options' })
+  @ApiQuery({ name: 'status', required: false, enum: ['active', 'inactive'], description: 'Filter departments by status' })
+  @ApiResponse({
+    status: 200,
+    description: 'The departments have been successfully retrieved with employee counts.',
+    type: [DepartmentListResponseDto]
+  })
+  @ApiResponse({ status: 401, description: 'Unauthorized' })
+  findAllByFilters(
+    @Query() paginationOptions: PaginationOptions<Department>,
+    @Query() filters: DepartmentFilterDto,
+    @GetUser('userId') userId: string,
+  ) {
+    return this.departmentService.findAllByFilters(paginationOptions, userId, filters);
   }
 
   @Get(':id')
