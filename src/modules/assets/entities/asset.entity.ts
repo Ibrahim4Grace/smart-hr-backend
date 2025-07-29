@@ -50,6 +50,9 @@ export class Asset extends AbstractBaseEntity {
     @JoinColumn({ name: 'assigned_to_employee_id' })
     assigned_to: Employee;
 
+    @Column({ type: 'timestamp', nullable: true })
+    assigned_at: Date;
+
     //relationship to track which HR added this assets
     @Index()
     @ManyToOne(() => User, (user) => user.assets, { onDelete: 'CASCADE' })

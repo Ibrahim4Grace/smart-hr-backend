@@ -13,6 +13,11 @@ import { Asset, AssetStatus } from './entities/asset.entity';
 import { AssetFilterDto } from './dto/filter-asset.dto';
 import { CloudinaryService } from '../../shared/services/cloudinary.service';
 
+interface QueryResults {
+  employee?: Employee | null;
+  serial?: Asset | null;
+}
+
 @Injectable()
 export class AssetsService extends BaseCacheableService {
 
@@ -189,6 +194,7 @@ export class AssetsService extends BaseCacheableService {
     userId: string,
     file?: Express.Multer.File
   ) {
+    // Sequential initial operations (user needed for permissions)
     const user = await this.permissionsService.getUserById(userId);
     const asset = await this.permissionsService.getEntityWithPermissionCheck(
       Asset,
@@ -197,36 +203,66 @@ export class AssetsService extends BaseCacheableService {
       ['added_by_hr', 'assigned_to']
     );
 
-    // Handle employee assignment
-    if (UpdateAssetDto.employee_id) {
-      const employee = await this.employeeRepository.findOne({
-        where: { id: UpdateAssetDto.employee_id }
-      });
-
-      if (!employee) {
-        throw new BadRequestException('Employee not found');
-      }
-
-      asset.assigned_to = employee;
-      asset.status = AssetStatus.ASSIGNED;
-    } else if (UpdateAssetDto.employee_id === null) {
-      asset.assigned_to = null;
-      asset.status = AssetStatus.AVAILABLE;
+    // Early validation
+    if (UpdateAssetDto.employee_id !== undefined &&
+      asset.assigned_to &&
+      asset.assigned_to.id !== UpdateAssetDto.employee_id) {
+      throw new BadRequestException('This asset is already assigned to another employee');
     }
 
+    //  parallelize truly independent operations
+    const operations = [];
+
+    if (UpdateAssetDto.employee_id) {
+      operations.push(['employee', this.employeeRepository.findOne({
+        where: { id: UpdateAssetDto.employee_id }
+      })]);
+    }
 
     if (UpdateAssetDto.serial_number && UpdateAssetDto.serial_number !== asset.serial_number) {
-      const existing = await this.assetRepository.findOne({
+      operations.push(['serial', this.assetRepository.findOne({
         where: {
           serial_number: UpdateAssetDto.serial_number,
           added_by_hr: { id: user.id },
-          id: Not(id) // Exclude current asset
+          id: Not(id)
         }
+      })]);
+    }
+
+    // Execute parallel operations
+    const results: QueryResults = {};
+    if (operations.length > 0) {
+      const resolved = await Promise.all(operations.map(([, promise]) => promise));
+      operations.forEach(([key], index) => {
+        results[key] = resolved[index];
       });
-      if (existing) {
-        throw new BadRequestException('Asset with this serial number already exists.');
+    }
+
+    if (UpdateAssetDto.employee_id && !results.employee) {
+      throw new BadRequestException('Employee not found');
+    }
+
+    if (results.serial) {
+      throw new BadRequestException('Asset with this serial number already exists.');
+    }
+
+
+    if (UpdateAssetDto.employee_id !== undefined) {
+      if (UpdateAssetDto.employee_id) {
+        if (asset.assigned_to && asset.assigned_to.id === results.employee.id) {
+          throw new BadRequestException('This asset is already assigned to this employee');
+        }
+
+        asset.assigned_to = results.employee;
+        asset.status = AssetStatus.ASSIGNED;
+        asset.assigned_at = new Date();
+      } else {
+        asset.assigned_to = null;
+        asset.status = AssetStatus.AVAILABLE;
+        asset.assigned_at = null;
       }
     }
+
 
     let asset_image_url = asset.asset_image_url;
     if (file) {
@@ -237,7 +273,6 @@ export class AssetsService extends BaseCacheableService {
       asset_image_url = await this.cloudinaryService.uploadFile(file, 'assets');
     }
 
-    // Update other fields (remove employee_id from UpdateAssetDto before assigning)
     const { employee_id, ...otherFields } = UpdateAssetDto;
     Object.assign(asset, otherFields, { asset_image_url });
 
@@ -245,17 +280,7 @@ export class AssetsService extends BaseCacheableService {
     await this.invalidateOnUpdate(id, userId, this.cachePrefixes.ASSET);
 
     return {
-      message: 'Asset updated successfully',
-      asset: {
-        id: asset.id,
-        serial_number: asset.serial_number,
-        type: asset.type,
-        status: asset.status,
-        assigned_to: asset.assigned_to ? {
-          id: asset.assigned_to.id,
-          name: asset.assigned_to.name
-        } : null
-      }
+      message: 'Asset updated successfully'
     };
   }
 
