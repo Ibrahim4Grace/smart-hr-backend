@@ -194,7 +194,6 @@ export class AssetsService extends BaseCacheableService {
     userId: string,
     file?: Express.Multer.File
   ) {
-    // Sequential initial operations (user needed for permissions)
     const user = await this.permissionsService.getUserById(userId);
     const asset = await this.permissionsService.getEntityWithPermissionCheck(
       Asset,
@@ -203,14 +202,7 @@ export class AssetsService extends BaseCacheableService {
       ['added_by_hr', 'assigned_to']
     );
 
-    // Early validation
-    if (UpdateAssetDto.employee_id !== undefined &&
-      asset.assigned_to &&
-      asset.assigned_to.id !== UpdateAssetDto.employee_id) {
-      throw new BadRequestException('This asset is already assigned to another employee');
-    }
-
-    //  parallelize truly independent operations
+    // Parallelize independent operations
     const operations = [];
 
     if (UpdateAssetDto.employee_id) {
@@ -246,24 +238,27 @@ export class AssetsService extends BaseCacheableService {
       throw new BadRequestException('Asset with this serial number already exists.');
     }
 
-
+    // Handle employee assignment logic
     if (UpdateAssetDto.employee_id !== undefined) {
       if (UpdateAssetDto.employee_id) {
-        if (asset.assigned_to && asset.assigned_to.id === results.employee.id) {
+        // Check if already assigned to this employee
+        if (asset.assigned_to && asset.assigned_to.id === UpdateAssetDto.employee_id) {
           throw new BadRequestException('This asset is already assigned to this employee');
         }
 
+        // Assign to new employee
         asset.assigned_to = results.employee;
         asset.status = AssetStatus.ASSIGNED;
         asset.assigned_at = new Date();
       } else {
+        // Unassign from current employee
         asset.assigned_to = null;
         asset.status = AssetStatus.AVAILABLE;
         asset.assigned_at = null;
       }
     }
 
-
+    // Handle file upload
     let asset_image_url = asset.asset_image_url;
     if (file) {
       if (asset_image_url) {
